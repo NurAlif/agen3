@@ -10,6 +10,7 @@ var bt_show_settings = document.querySelector("#bt_show_settings");
 var bt_show_manuctrl = document.querySelector("#bt_show_manuctrl");
 var bt_show_headctrl = document.querySelector("#bt_show_headctrl");
 var bt_show_pidmon = document.querySelector("#bt_show_pidmon");
+var bt_show_monitor = document.querySelector("#bt_show_monitor");
 var bt_send_stationary = document.querySelector("#bt_send_stationary");
 var bt_submit_settings = document.querySelector("#bt_submit_settings");
 $("#"+bt_send_stationary.id).collapse("hide");
@@ -610,7 +611,8 @@ var collapsibles = [
     $("#settings"),
     $("#manual_ctrl"),
     $("#head_ctrl"),
-    $("#pid_mon")
+    $("#pid_mon"),
+    $("#monitor_window")
 ];
 
 var onShow = null; 
@@ -678,6 +680,22 @@ bt_show_pidmon.addEventListener("click", function(event) {
         onShow.collapse("hide");
         collapsibles[3].collapse("show");
         onShow = collapsibles[3];
+    }
+}, false);
+
+bt_show_monitor.addEventListener("click", function(event) {
+    event.preventDefault();
+    if(onShow == null){
+        collapsibles[4].collapse("show");
+        onShow = collapsibles[4];
+    }else if(onShow == collapsibles[4]){
+        collapsibles[4].collapse("hide");
+        onShow = null;
+    }
+    else{
+        onShow.collapse("hide");
+        collapsibles[4].collapse("show");
+        onShow = collapsibles[4];
     }
 }, false);
 

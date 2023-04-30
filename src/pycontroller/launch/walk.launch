@@ -10,8 +10,8 @@
     
     <!-- OP3 Manager -->
     <node pkg="op3_manager" type="op3_manager" name="op3_manager" output="screen">
-	  <param name="angle_unit" value="30" />
+	    <param name="angle_unit" value="30" />
 	</node>
     
-    <node pkg="pycontroller" type="walk.py" name="controllerpy"/>
+    <node pkg="pycontroller" type="walk.py" name="controllerpy" output="screen"/>
 </launch>

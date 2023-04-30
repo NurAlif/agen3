@@ -10,7 +10,7 @@ import json
 
 # websocket
 import threading
-import manuinf as inference
+import inference2 as inference
 import ball_tracking
 from configloader import read_walk_balance_conf
 
@@ -330,11 +330,11 @@ def main():
 
     time.sleep(5)
 
-    # if(inference.startInference() < 0):
-    #     rospy.loginfo("Inference Start ERROR")
-    #     raise SystemExit('ERROR: failed to open camera!')
-    # else:
-    #     rospy.loginfo("Inference Started")
+    if(inference.startInference() < 0):
+        rospy.loginfo("Inference Start ERROR")
+        raise SystemExit('ERROR: failed to start inference!')
+    else:
+        rospy.loginfo("Inference Started")
 
     val = -0.9
     dir = 0.01
@@ -345,10 +345,10 @@ def main():
         if(delta_t > SEND_PARAM_INTERVAL):
             lastSendParamTic = toc
 
-            walking.stepToTargetVel()
-            sendWithWalkParams()
+            # walking.stepToTargetVel()
+            # sendWithWalkParams()
 
-        # inference.detect(track_ball)
+        inference.detect(track_ball)
 
 
         # ball_tracking.track(track_ball)
