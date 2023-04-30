@@ -10,8 +10,6 @@ import time
 from aiortc import VideoStreamTrack
 from av import VideoFrame
 
-ROOT = os.path.dirname(__file__)
-
 webcam = None
 
 AUDIO_PTIME = 0.020 

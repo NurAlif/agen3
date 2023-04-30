@@ -59,54 +59,55 @@ lastSendParamTic = time.time()
 
 isManagerReady = False
 
-@webrtc.data_channel.on("message")
-def handle(message):
-    data = json.loads(message)
-    print(data)
-    cmd = data['cmd']
+def set_datachannel_handle():
+    @webrtc.data_channel.on("message")
+    def handle(message):
+        data = json.loads(message)
+        print(data)
+        cmd = data['cmd']
 
-    if cmd == 'torque_on':
-        startRobot()
-    elif cmd == 'torque_off':
-        setDxlTorque()
-        send_message("torque_control", False)
-    elif cmd == 'start_walk':
-        setWalkCmd("start")
-        send_message("walk_control", True)
-    elif cmd == 'stop_walk':
-        setWalkCmd("stop")
-        send_message("walk_control", False)
-    elif cmd == 'save_walk_params':
-        setWalkCmd("save")
-        send_message("walk_params_saved", True)
-    elif cmd == 'get_walk_params':
-        send_message("update_walk_params", getWalkParams())
-    elif cmd == 'set_walk_params':
-        setWalkParams(data['params'])
-        send_message("controller_msg", 'Walk params changed')
-    elif cmd == "set_walking":
-        vectorDict = data['params']
-        vector = Vector2yaw(vectorDict["x"], vectorDict["y"], vectorDict["yaw"])
-        walking.setTarget(vector)
-    elif cmd == 'set_walking_offset':
-        walking.setWalkingOffset()
-        send_message("controller_msg", 'Walking offset changed')
-    elif cmd == 'set_walking_conf':
-        walking.setWalkingConf(data['params'])
-        send_message("controller_msg", 'Walking configuration changed')
-    elif cmd == 'get_walking_conf':
-        send_message("update_walking_conf", walking.getWalkingConf())
-    elif cmd == 'get_walking':
-        send_message("update_walking", walking.getWalkingConf())
-    elif cmd == 'gyro_init':
-        init_gyro()
-        send_message("controller_msg", "Init gyro success")
-    elif cmd == 'head_direct':
-        headControlDirect(data['params'])
-    elif cmd == 'track_head_control':
-        headControlHandle(data['params'])
-    elif cmd == 'edit_head_pid':
-        headPIDHandle(data['params'])
+        if cmd == 'torque_on':
+            startRobot()
+        elif cmd == 'torque_off':
+            setDxlTorque()
+            send_message("torque_control", False)
+        elif cmd == 'start_walk':
+            setWalkCmd("start")
+            send_message("walk_control", True)
+        elif cmd == 'stop_walk':
+            setWalkCmd("stop")
+            send_message("walk_control", False)
+        elif cmd == 'save_walk_params':
+            setWalkCmd("save")
+            send_message("walk_params_saved", True)
+        elif cmd == 'get_walk_params':
+            send_message("update_walk_params", getWalkParams())
+        elif cmd == 'set_walk_params':
+            setWalkParams(data['params'])
+            send_message("controller_msg", 'Walk params changed')
+        elif cmd == "set_walking":
+            vectorDict = data['params']
+            vector = Vector2yaw(vectorDict["x"], vectorDict["y"], vectorDict["yaw"])
+            walking.setTarget(vector)
+        elif cmd == 'set_walking_offset':
+            walking.setWalkingOffset()
+            send_message("controller_msg", 'Walking offset changed')
+        elif cmd == 'set_walking_conf':
+            walking.setWalkingConf(data['params'])
+            send_message("controller_msg", 'Walking configuration changed')
+        elif cmd == 'get_walking_conf':
+            send_message("update_walking_conf", walking.getWalkingConf())
+        elif cmd == 'get_walking':
+            send_message("update_walking", walking.getWalkingConf())
+        elif cmd == 'gyro_init':
+            init_gyro()
+            send_message("controller_msg", "Init gyro success")
+        elif cmd == 'head_direct':
+            headControlDirect(data['params'])
+        elif cmd == 'track_head_control':
+            headControlHandle(data['params'])
+        elif cmd == 'edit_head_pid':
+            headPIDHandle(data['params'])
 
 def send_message(cmd, params):
     resp = {
@@ -114,11 +115,8 @@ def send_message(cmd, params):
         "params" : params
     }
     respJson = json.dumps(resp)
-    webrtc.data_channel.send(respJson)
-
-def forever_webrtc():
-    print("Starting WebRTC...")
-    webrtc.start()
+    if webrtc.data_channel:
+        webrtc.data_channel.send(respJson)
 
 def sendHeadControl(pitch, yaw):
     js = JointState()
@@ -275,10 +273,39 @@ def handleStatusMsg(statusMsg):
 
     send_message('update_status', statusDict)
 
-def main():
-
+def main_thread():
     global lastSendParamTic
     global track_ball
+
+    while not webrtc.data_channel:
+        time.sleep(1)
+        
+    set_datachannel_handle()
+    print("main thread is running")
+    while not rospy.is_shutdown():
+        toc = time.time()
+        delta_t = toc - lastSendParamTic
+        if(delta_t > SEND_PARAM_INTERVAL):
+            lastSendParamTic = toc
+
+            # walking.stepToTargetVel()
+            # sendWithWalkParams()
+
+        inference.detect(track_ball)
+
+
+        # ball_tracking.track(track_ball)
+        
+        # sendHeadControl(ball_tracking.pitch, ball_tracking.yaw)
+        
+        # val+=dir
+        # if(val >= 0.9):
+        #     dir = -0.1
+        # if(val <= -0.9):
+        #     dir = 0.1
+
+def main():
+
     global t1
 
     rospy.init_node('main', anonymous=True)
@@ -308,34 +335,14 @@ def main():
         webrtc.init_video_track(inference.videocap)
         rospy.loginfo("video capture started")
 
-    val = -0.9
-    dir = 0.01
-
-    while not rospy.is_shutdown():
-        toc = time.time()
-        delta_t = toc - lastSendParamTic
-        if(delta_t > SEND_PARAM_INTERVAL):
-            lastSendParamTic = toc
-
-            # walking.stepToTargetVel()
-            # sendWithWalkParams()
-
-        inference.detect(track_ball)
-
-
-        # ball_tracking.track(track_ball)
-        
-        # sendHeadControl(ball_tracking.pitch, ball_tracking.yaw)
-        
-        # val+=dir
-        # if(val >= 0.9):
-        #     dir = -0.1
-        # if(val <= -0.9):
-        #     dir = 0.1
-
-    t1 = threading.Thread(target=forever_webrtc)
+    t1 = threading.Thread(target=main_thread)
     t1.start()
-    print("Pycontroller init DONE")
+    
+    print("Starting WebRTC...")
+    webrtc.start()
+    
+
+    
             
 
 

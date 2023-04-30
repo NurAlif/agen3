@@ -25,13 +25,14 @@ function negotiate() {
         });
     }).then(function () {
         var offer = pc.localDescription;
-        return fetch(':8090/offer', {
+        return fetch('http://192.168.0.99:8090/offer', {
             body: JSON.stringify({
                 sdp: offer.sdp,
                 type: offer.type,
             }),
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'Referrer-Policy': 'unsafe-url'
             },
             method: 'POST'
         });
