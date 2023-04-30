@@ -1,5 +1,4 @@
 import asyncio
-import json
 import os
 import fractions
 import cv2
@@ -8,18 +7,17 @@ import threading
 from typing import Tuple
 import time
 
+from aiortc import VideoStreamTrack
 from av import VideoFrame
-
-from aiohttp import web
-from aiortc import RTCPeerConnection, RTCSessionDescription, VideoStreamTrack
-from aiortc.rtcrtpsender import RTCRtpSender
 
 ROOT = os.path.dirname(__file__)
 
-
-relay = None
 webcam = None
 
+AUDIO_PTIME = 0.020 
+VIDEO_CLOCK_RATE = 900
+VIDEO_PTIME = 1 / 5  
+VIDEO_TIME_BASE = fractions.Fraction(1, VIDEO_CLOCK_RATE)
 
 def gstreamer_pipeline(
     sensor_id=0,
@@ -47,48 +45,6 @@ def gstreamer_pipeline(
             display_height,
         )
     )
-
-
-AUDIO_PTIME = 0.020  # 20ms audio packetization
-VIDEO_CLOCK_RATE = 900
-VIDEO_PTIME = 1 / 5  # 30fps
-VIDEO_TIME_BASE = fractions.Fraction(1, VIDEO_CLOCK_RATE)
-
-# bufferless VideoCapture
-
-
-class VideoCapture:
-
-    def __init__(self):
-        self.frameOut = None
-        self.frameIn = None
-        self.cap = cv2.VideoCapture(gstreamer_pipeline(), cv2.CAP_GSTREAMER)
-        self.q = queue.Queue()
-        t = threading.Thread(target=self._reader)
-        t.daemon = True
-        t.start()
-
-    # read frames as soon as they are available, keeping only most recent one
-    def _reader(self):
-        while True:
-            ret, frame = self.cap.read()
-            if not ret:
-                break
-            if not self.q.empty():
-                try:
-                    self.q.get_nowait()   # discard previous (unprocessed) frame
-                except queue.Empty:
-                    pass
-            self.q.put(frame)
-
-    def read_in(self):
-        return self.q.get()
-    def store_out(self, frame):
-        self.frameIn = frame
-    def read_out(self):
-        temp = self.frameOut
-        self.frameOut = self.frameIn
-        return temp
 
 
 class VideoOpencvTrack(VideoStreamTrack):
@@ -129,60 +85,34 @@ class VideoOpencvTrack(VideoStreamTrack):
         return new_frame
 
 
-def force_codec(pc, sender, forced_codec):
-    kind = forced_codec.split("/")[0]
-    codecs = RTCRtpSender.getCapabilities(kind).codecs
-    transceiver = next(t for t in pc.getTransceivers() if t.sender == sender)
-    transceiver.setCodecPreferences(
-        [codec for codec in codecs if codec.mimeType == forced_codec]
-    )
+class VideoCapture:
 
+    def __init__(self):
+        self.frameOut = None
+        self.frameIn = None
+        self.cap = cv2.VideoCapture(gstreamer_pipeline(), cv2.CAP_GSTREAMER)
+        self.q = queue.Queue()
+        t = threading.Thread(target=self._reader)
+        t.daemon = True
+        t.start()
 
-async def offer(request):
-    global video
-    params = await request.json()
-    offer = RTCSessionDescription(sdp=params["sdp"], type=params["type"])
+    def _reader(self):
+        while True:
+            ret, frame = self.cap.read()
+            if not ret:
+                break
+            if not self.q.empty():
+                try:
+                    self.q.get_nowait()  
+                except queue.Empty:
+                    pass
+            self.q.put(frame)
 
-    pc = RTCPeerConnection()
-    pcs.add(pc)
-
-    @pc.on("connectionstatechange")
-    async def on_connectionstatechange():
-        print("Connection state is %s" % pc.connectionState)
-        if pc.connectionState == "failed":
-            await pc.close()
-            pcs.discard(pc)
-
-    if video:
-        pc.addTrack(video)
-
-    await pc.setRemoteDescription(offer)
-
-    answer = await pc.createAnswer()
-    await pc.setLocalDescription(answer)
-
-    return web.Response(
-        content_type="application/json",
-        text=json.dumps(
-            {"sdp": pc.localDescription.sdp, "type": pc.localDescription.type}
-        ),
-    )
-
-
-pcs = set()
-
-
-async def on_shutdown(app):
-    # close peer connections
-    coros = [pc.close() for pc in pcs]
-    await asyncio.gather(*coros)
-    pcs.clear()
-
-video = None
-
-def start(vcap):
-    app = web.Application()
-    app.on_shutdown.append(on_shutdown)
-    app.router.add_post("/offer", offer)
-    VideoOpencvTrack(vcap)
-    web.run_app(app, host="0.0.0.0", port=8090)
+    def read_in(self):
+        return self.q.get()
+    def store_out(self, frame):
+        self.frameIn = frame
+    def read_out(self):
+        temp = self.frameOut
+        self.frameOut = self.frameIn
+        return temp

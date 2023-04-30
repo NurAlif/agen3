@@ -1,4 +1,50 @@
-ws = new WebSocket("ws://"+ "192.168.0.99" +":8077");
+var pc = null;
+var data_channel = null;
+
+function negotiate() {
+    pc.addTransceiver('video', { direction: 'recvonly' });
+
+    data_channel = pc.createDataChannel("anu");
+
+    return pc.createOffer().then(function (offer) {
+        return pc.setLocalDescription(offer);
+    }).then(function () {
+        // wait for ICE gathering to complete
+        return new Promise(function (resolve) {
+            if (pc.iceGatheringState === 'complete') {
+                resolve();
+            } else {
+                function checkState() {
+                    if (pc.iceGatheringState === 'complete') {
+                        pc.removeEventListener('icegatheringstatechange', checkState);
+                        resolve();
+                    }
+                }
+                pc.addEventListener('icegatheringstatechange', checkState);
+            }
+        });
+    }).then(function () {
+        var offer = pc.localDescription;
+        return fetch(':8090/offer', {
+            body: JSON.stringify({
+                sdp: offer.sdp,
+                type: offer.type,
+            }),
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            method: 'POST'
+        });
+    }).then(function (response) {
+        return response.json();
+    }).then(function (answer) {
+        return pc.setRemoteDescription(answer);
+    }).catch(function (e) {
+        alert(e);
+    });
+}
+
+
 
 var con_h1 = document.getElementById("con_h1");
 var con_log = document.getElementById("log_container");
@@ -326,13 +372,14 @@ function handleStatusMsg(params){
 
 
 
-ws.onopen = function (e){
+function myHandleOpen (e){
     con_h1.innerHTML = "CONNECTED";
     getAll();
 };
 
-ws.onmessage = function (event){
-    // console.log(event.data)
+function myHandleMessage(event){
+    console.log(event.data)
+
     var obj = JSON.parse(event.data);
     
     if(obj.cmd == null) return;
@@ -371,13 +418,35 @@ ws.onmessage = function (event){
     }
 }
 
-ws.onerror = function(err) {
-    console.error('Socket encountered error: ', err.message, 'Closing socket');
-    ws.close();
-    alert.show(alert.TYPE_DANGER, "You are not connected with the robot!");
-    con_h1.innerHTML = "ERR! DISCONNECTED";
-    con_h1.style.backgroundColor = "red";
-};
+function start() {
+    var config = {
+        sdpSemantics: 'unified-plan'
+    };
+
+
+    pc = new RTCPeerConnection(config);
+
+    // connect audio / video
+    pc.addEventListener('track', function (evt) {
+        if (evt.track.kind == 'video') {
+            document.getElementById('video_vision').srcObject = evt.streams[0];
+        }
+    });
+
+    pc.addEventListener(
+        "datachannel",
+        (ev) => {
+            receiveChannel = ev.channel;
+            receiveChannel.onmessage = myHandleMessage;
+            receiveChannel.onopen = myHandleOpen;
+        },
+        false
+    );
+
+    negotiate();
+
+}
+
 
 function onSubmit(id){
     var el = document.getElementById(id);
@@ -550,32 +619,14 @@ document.addEventListener("keyup", event => {
 
 function sendCmd(cmd){
     var data = '{"cmd":"'+ cmd +'"}';
-    ws.send(data);
+    data_channel.send(data);
 }
 
 function sendParameterized(cmd, param){
     var data = '{"cmd":"'+ cmd +'","params":'+param+'}';
-    console.log(data);
-    ws.send(data);
+    //console.log(data);
+    data_channel.send(data);
 }
-
-// function sendCmd(_cmd){
-//     let dataObj = {
-//         cmd: _cmd
-//     }
-//     var data = JSON.stringify(dataObj);
-//     ws.send(data);
-// }
-
-// function sendParameterized(_cmd, param){
-//     let dataObj = {
-//         cmd: _cmd,
-//         params: param
-//     }
-
-//     var data = JSON.stringify(dataObj);
-//     ws.send(data);
-// }
 
 bt_torque_toggle.addEventListener("click", function(event) {
     event.preventDefault();
@@ -739,3 +790,4 @@ var realTimeControl = setInterval(function (){
     }
 }, 100);
 
+start()

@@ -17,9 +17,9 @@ from configloader import read_walk_balance_conf
 from walking import Vector2, Vector2yaw, CONTROL_MODE_HEADLESS, CONTROL_MODE_YAWMODE, Walking
 from walk_utils import joints, getWalkParamsDict, setWalkParamsConvert
 
+import webrtc
 
-# import asyncio
-from simple_websocket_server import WebSocketServer, WebSocket
+import asyncio
 
 from std_msgs.msg import String
 from robotis_controller_msgs.msg import SyncWriteItem
@@ -44,6 +44,7 @@ currentWalkParams = None # ? params
 walkParams = None
 
 server = None
+t1 = None
 
 robotIsOn = False
 walking_module_enabled = False
@@ -58,98 +59,66 @@ lastSendParamTic = time.time()
 
 isManagerReady = False
 
-class WS(WebSocket):
-    def handle(self):
-        data = json.loads(self.data)
-        print(data)
-        cmd = data['cmd']
+@webrtc.data_channel.on("message")
+def handle(message):
+    data = json.loads(message)
+    print(data)
+    cmd = data['cmd']
 
-        if cmd == 'torque_on':
-            startRobot()
-        elif cmd == 'torque_off':
-            setDxlTorque()
-            send_message(-1, "torque_control", False)
-        elif cmd == 'start_walk':
-            setWalkCmd("start")
-            send_message(-1, "walk_control", True)
-        elif cmd == 'stop_walk':
-            setWalkCmd("stop")
-            send_message(-1, "walk_control", False)
-        elif cmd == 'save_walk_params':
-            setWalkCmd("save")
-            send_message(-1, "walk_params_saved", True)
-        elif cmd == 'get_walk_params':
-            send_message(-1, "update_walk_params", getWalkParams())
-        elif cmd == 'set_walk_params':
-            setWalkParams(data['params'])
-            send_message(-1, "controller_msg", 'Walk params changed')
-        elif cmd == "set_walking":
-            if(self.address[1] == walking.control):
-                vectorDict = data['params']
-                vector = Vector2yaw(vectorDict["x"], vectorDict["y"], vectorDict["yaw"])
-                walking.setTarget(vector)
-        elif cmd == 'set_walking_offset':
-            walking.setWalkingOffset()
-            send_message(-1, "controller_msg", 'Walking offset changed')
-        elif cmd == 'set_walking_conf':
-            walking.setWalkingConf(data['params'])
-            send_message(-1, "controller_msg", 'Walking configuration changed')
-        elif cmd == "set_control_walking":
-            if data['params'] == 1:
-                walking.control = self.address[1]
-                send_message(-1, "control_override", self.address)
-            else:
-                walking.control = None
-                send_message(-1, "control_override", -1)
-        elif cmd == 'get_walking_conf':
-            send_message(-1, "update_walking_conf", walking.getWalkingConf())
-        elif cmd == 'get_walking':
-            send_message(self.address[1], "update_walking", walking.getWalkingConf())
-        elif cmd == 'gyro_init':
-            init_gyro()
-            send_message(-1, "controller_msg", "Init gyro success")
-        elif cmd == 'head_direct':
-            headControlDirect(data['params'])
-        elif cmd == 'track_head_control':
-            headControlHandle(data['params'])
-        elif cmd == 'edit_head_pid':
-            headPIDHandle(data['params'])
+    if cmd == 'torque_on':
+        startRobot()
+    elif cmd == 'torque_off':
+        setDxlTorque()
+        send_message("torque_control", False)
+    elif cmd == 'start_walk':
+        setWalkCmd("start")
+        send_message("walk_control", True)
+    elif cmd == 'stop_walk':
+        setWalkCmd("stop")
+        send_message("walk_control", False)
+    elif cmd == 'save_walk_params':
+        setWalkCmd("save")
+        send_message("walk_params_saved", True)
+    elif cmd == 'get_walk_params':
+        send_message("update_walk_params", getWalkParams())
+    elif cmd == 'set_walk_params':
+        setWalkParams(data['params'])
+        send_message("controller_msg", 'Walk params changed')
+    elif cmd == "set_walking":
+        vectorDict = data['params']
+        vector = Vector2yaw(vectorDict["x"], vectorDict["y"], vectorDict["yaw"])
+        walking.setTarget(vector)
+    elif cmd == 'set_walking_offset':
+        walking.setWalkingOffset()
+        send_message("controller_msg", 'Walking offset changed')
+    elif cmd == 'set_walking_conf':
+        walking.setWalkingConf(data['params'])
+        send_message("controller_msg", 'Walking configuration changed')
+    elif cmd == 'get_walking_conf':
+        send_message("update_walking_conf", walking.getWalkingConf())
+    elif cmd == 'get_walking':
+        send_message("update_walking", walking.getWalkingConf())
+    elif cmd == 'gyro_init':
+        init_gyro()
+        send_message("controller_msg", "Init gyro success")
+    elif cmd == 'head_direct':
+        headControlDirect(data['params'])
+    elif cmd == 'track_head_control':
+        headControlHandle(data['params'])
+    elif cmd == 'edit_head_pid':
+        headPIDHandle(data['params'])
 
-    def connected(self):
-        print(self.address, 'connected')
-        clientID = self.address[1]
-        clients.update({clientID: self})
-        send_message(clientID, "device_connected", self.address)
-        send_message(clientID, "torque_control", robotIsOn)
-
-    def handle_close(self):
-        clients.pop(self.address)
-        print(self.address, 'closed')
-        send_message(-1, "device_disconnected", self.address)
-
-def send_message(id, cmd, params):
+def send_message(cmd, params):
     resp = {
         "cmd" : cmd,
         "params" : params
     }
     respJson = json.dumps(resp)
-    if(id >= 0):
-        clients[id].send_message(respJson)
-    else:
-        for client in clients.values():
-            client.send_message(respJson)
+    webrtc.data_channel.send(respJson)
 
-
-
-def forever_ws():
-    global server
-
-    server = WebSocketServer('', 8077, WS)
-    server.serve_forever()
-    print("Websocket is running...")
-
-
-t1 = threading.Thread(target=forever_ws)
+def forever_webrtc():
+    print("Starting WebRTC...")
+    webrtc.start()
 
 def sendHeadControl(pitch, yaw):
     js = JointState()
@@ -173,7 +142,7 @@ def sendWithWalkParams():
         walkParams.y_move_amplitude = 0.0
     
     pubSetParams.publish(walkParams)
-    send_message(-1, "update_walking", walking.getWalkingCurrent())
+    send_message("update_walking", walking.getWalkingCurrent())
 
 def enableWalk():
     pubEnaMod.publish("walking_module")
@@ -269,7 +238,7 @@ def handleImu(imu_msg_):
     imu = imu_msg_
 
 def handleBalanceMonitor(msg):
-    send_message(-1, "balance_monitor", msg.data)
+    send_message("balance_monitor", msg.data)
 
 def onFinishInitPose():
     enableWalk()
@@ -294,7 +263,7 @@ def handleStatusMsg(statusMsg):
 
     if(statusMsg.status_msg == "Finish Init Pose"):
         enableWalk()
-        send_message(-1, "torque_control", True)
+        send_message("torque_control", True)
         global isManagerReady
         isManagerReady = True
 
@@ -304,14 +273,14 @@ def handleStatusMsg(statusMsg):
         'status_msg':statusMsg.status_msg
     }
 
-    send_message(-1, 'update_status', statusDict)
+    send_message('update_status', statusDict)
 
 def main():
 
-
     global lastSendParamTic
     global track_ball
-    t1.start()
+    global t1
+
     rospy.init_node('main', anonymous=True)
 
     #rospy.Subscriber("/robotis/open_cr/imu", Imu, handleImu)
@@ -336,7 +305,8 @@ def main():
         rospy.loginfo("Inference Start ERROR")
         raise SystemExit('ERROR: failed to start inference!')
     else:
-        rospy.loginfo("Inference Started")
+        webrtc.init_video_track(inference.videocap)
+        rospy.loginfo("video capture started")
 
     val = -0.9
     dir = 0.01
@@ -362,6 +332,10 @@ def main():
         #     dir = -0.1
         # if(val <= -0.9):
         #     dir = 0.1
+
+    t1 = threading.Thread(target=forever_webrtc)
+    t1.start()
+    print("Pycontroller init DONE")
             
 
 

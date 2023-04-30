@@ -153,17 +153,10 @@ def startInference():
     init_tensorrt()
 
     videocap = streamer.VideoCapture()
-
-    streamer.start(videocap)
     
-    print('MJPEG server started...')
+    print('Inference started...')
     return 0
 
 def inferenceLoop(track_ball):
     while(True):
         detect(track_ball)
-
-
-def shutdown():
-    global mjpeg_server
-    global cam
