@@ -2,3 +2,7 @@ build
 devel
 *.pub
 *.ssh
+*.pyc
+src/pycontroller/scripts/utils/__pycache__/
+.catkin_tools/
+logs/

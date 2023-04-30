@@ -141,15 +141,15 @@ def send_message(id, cmd, params):
 
 
 
-def forever_ws(num):
+def forever_ws():
     global server
 
     server = WebSocketServer('', 8077, WS)
-    print("Websocket is running...")
     server.serve_forever()
+    print("Websocket is running...")
 
 
-t1 = threading.Thread(target=forever_ws, args=(10,))
+t1 = threading.Thread(target=forever_ws)
 
 def sendHeadControl(pitch, yaw):
     js = JointState()
@@ -320,7 +320,9 @@ def main():
     
     rospy.loginfo("Waiting manager...")
     global isManagerReady
-    while(isManagerReady==False): 
+    wait_count = 0
+    while(isManagerReady==False and wait_count < 15): 
+        wait_count += 1
         time.sleep(1)
 
     print("controller runnning")

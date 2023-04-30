@@ -2,6 +2,7 @@ var pc = null;
 
 function negotiateRTC() {
     pc.addTransceiver('video', {direction: 'recvonly'});
+    pc.addTransceiver('data', {direction: 'recvonly'});
     return pc.createOffer().then(function(offer) {
         return pc.setLocalDescription(offer);
     }).then(function() {
@@ -21,7 +22,7 @@ function negotiateRTC() {
         });
     }).then(function() {
         var offer = pc.localDescription;
-        return fetch('/offer', {
+        return fetch(':8090/offer', {
             body: JSON.stringify({
                 sdp: offer.sdp,
                 type: offer.type,
@@ -55,6 +56,9 @@ function startVision() {
     pc.addEventListener('track', function(evt) {
         if (evt.track.kind == 'video') {
             document.getElementById('video_vision').srcObject = evt.streams[0];
+        }
+        else if (evt.track.kind == 'data') {
+            console.log("anuan");
         }
     });
 
