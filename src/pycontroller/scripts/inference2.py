@@ -10,27 +10,44 @@ from collections import OrderedDict,namedtuple
 
 import math
 
-import streamer
+import streamer as streamer
 
 #DEF YOLO START
 w = '/home/name/best.trt'
 device = torch.device('cuda:0')
 
+bindings = None
+binding_addrs = None
+context = None
+
+
+
 # Infer TensorRT Engine
-Binding = namedtuple('Binding', ('name', 'dtype', 'shape', 'data', 'ptr'))
-logger = trt.Logger(trt.Logger.INFO)
-trt.init_libnvinfer_plugins(logger, namespace="")
-with open(w, 'rb') as f, trt.Runtime(logger) as runtime:
-    model = runtime.deserialize_cuda_engine(f.read())
-bindings = OrderedDict()
-for index in range(model.num_bindings):
-    name = model.get_binding_name(index)
-    dtype = trt.nptype(model.get_binding_dtype(index))
-    shape = tuple(model.get_binding_shape(index))
-    data = torch.from_numpy(np.empty(shape, dtype=np.dtype(dtype))).to(device)
-    bindings[name] = Binding(name, dtype, shape, data, int(data.data_ptr()))
-binding_addrs = OrderedDict((n, d.ptr) for n, d in bindings.items())
-context = model.create_execution_context()
+def init_tensorrt():
+    global bindings
+    global binding_addrs
+    global context
+
+    Binding = namedtuple('Binding', ('name', 'dtype', 'shape', 'data', 'ptr'))
+    logger = trt.Logger(trt.Logger.INFO)
+    trt.init_libnvinfer_plugins(logger, namespace="")
+    with open(w, 'rb') as f, trt.Runtime(logger) as runtime:
+        model = runtime.deserialize_cuda_engine(f.read())
+    bindings = OrderedDict()
+    for index in range(model.num_bindings):
+        name = model.get_binding_name(index)
+        dtype = trt.nptype(model.get_binding_dtype(index))
+        shape = tuple(model.get_binding_shape(index))
+        data = torch.from_numpy(np.empty(shape, dtype=np.dtype(dtype))).to(device)
+        bindings[name] = Binding(name, dtype, shape, data, int(data.data_ptr()))
+    binding_addrs = OrderedDict((n, d.ptr) for n, d in bindings.items())
+    context = model.create_execution_context()
+
+        # warmup for 10 times
+    for _ in range(10):
+        tmp = torch.randn(1,3,480,320).to(device)
+        binding_addrs['images'] = int(tmp.data_ptr())
+        context.execute_v2(list(binding_addrs.values()))
 
 def letterbox(im, new_shape=(480, 320), color=(114, 114, 114), auto=True, scaleup=True, stride=32):
     # Resize and pad image while meeting stride-multiple constraints
@@ -72,12 +89,6 @@ colors = {name:[random.randint(0, 255) for _ in range(3)] for i,name in enumerat
 
 videocap = None
 
-# warmup for 10 times
-for _ in range(10):
-    tmp = torch.randn(1,3,480,320).to(device)
-    binding_addrs['images'] = int(tmp.data_ptr())
-    context.execute_v2(list(binding_addrs.values()))
-
 
 class Tracking:
     def __init__(self):
@@ -92,15 +103,13 @@ class Tracking:
 
 def detect(track_ball):
 
-    global tic
-    global lost_count
-    global cam
-    global trt_yolo
-    global vis
-    global ball_lock
+    global bindings
+    global binding_addrs
+    global context
+
     global videocap
 
-    img = videocap.readIn()
+    img = videocap.read_in()
 
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     image = img.copy()
@@ -121,6 +130,8 @@ def detect(track_ball):
 
     nums = bindings['num_dets'].data
     boxes = bindings['det_boxes'].data
+    boxes = bindings['det_boxes'].data
+    classes = bindings['det_classes'].data
 
     boxes = boxes[0,:nums[0][0]]
     classes = classes[0,:nums[0][0]]
@@ -136,20 +147,14 @@ def detect(track_ball):
 
 def startInference():
 
-    global cam
-    global mjpeg_server
-    global vis
-    global trt_yolo
     global videocap
 
-    global model
-    global category_num
-    global letter_box
-    global mjpeg_port
-
+    init_tensorrt()
     videocap = streamer.VideoCapture()
+    track = streamer.VideoOpencvTrack(videocap)
+    streamer.video = track
 
-    print('MJPEG server started...')
+    print('inference is running...')
     return 0
 
 def inferenceLoop(track_ball):
@@ -158,7 +163,4 @@ def inferenceLoop(track_ball):
 
 
 def shutdown():
-    global mjpeg_server
-    global cam
-    mjpeg_server.shutdown()
-    cam.release()
+    videocap.release()

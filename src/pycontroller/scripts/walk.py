@@ -8,6 +8,9 @@ import rospy
 import time
 import json
 
+import websockets
+import asyncio
+
 # websocket
 import threading
 import inference2 as inference
@@ -16,10 +19,6 @@ from configloader import read_walk_balance_conf
 
 from walking import Vector2, Vector2yaw, CONTROL_MODE_HEADLESS, CONTROL_MODE_YAWMODE, Walking
 from walk_utils import joints, getWalkParamsDict, setWalkParamsConvert
-
-
-# import asyncio
-from simple_websocket_server import WebSocketServer, WebSocket
 
 from std_msgs.msg import String
 from robotis_controller_msgs.msg import SyncWriteItem
@@ -58,98 +57,119 @@ lastSendParamTic = time.time()
 
 isManagerReady = False
 
-class WS(WebSocket):
-    def handle(self):
-        data = json.loads(self.data)
-        print(data)
-        cmd = data['cmd']
+connected_clients = {}
 
-        if cmd == 'torque_on':
-            startRobot()
-        elif cmd == 'torque_off':
-            setDxlTorque()
-            send_message(-1, "torque_control", False)
-        elif cmd == 'start_walk':
-            setWalkCmd("start")
-            send_message(-1, "walk_control", True)
-        elif cmd == 'stop_walk':
-            setWalkCmd("stop")
-            send_message(-1, "walk_control", False)
-        elif cmd == 'save_walk_params':
-            setWalkCmd("save")
-            send_message(-1, "walk_params_saved", True)
-        elif cmd == 'get_walk_params':
-            send_message(-1, "update_walk_params", getWalkParams())
-        elif cmd == 'set_walk_params':
-            setWalkParams(data['params'])
-            send_message(-1, "controller_msg", 'Walk params changed')
-        elif cmd == "set_walking":
-            if(self.address[1] == walking.control):
-                vectorDict = data['params']
-                vector = Vector2yaw(vectorDict["x"], vectorDict["y"], vectorDict["yaw"])
-                walking.setTarget(vector)
-        elif cmd == 'set_walking_offset':
-            walking.setWalkingOffset()
-            send_message(-1, "controller_msg", 'Walking offset changed')
-        elif cmd == 'set_walking_conf':
-            walking.setWalkingConf(data['params'])
-            send_message(-1, "controller_msg", 'Walking configuration changed')
-        elif cmd == "set_control_walking":
-            if data['params'] == 1:
-                walking.control = self.address[1]
-                send_message(-1, "control_override", self.address)
-            else:
-                walking.control = None
-                send_message(-1, "control_override", -1)
-        elif cmd == 'get_walking_conf':
-            send_message(-1, "update_walking_conf", walking.getWalkingConf())
-        elif cmd == 'get_walking':
-            send_message(self.address[1], "update_walking", walking.getWalkingConf())
-        elif cmd == 'gyro_init':
-            init_gyro()
-            send_message(-1, "controller_msg", "Init gyro success")
-        elif cmd == 'head_direct':
-            headControlDirect(data['params'])
-        elif cmd == 'track_head_control':
-            headControlHandle(data['params'])
-        elif cmd == 'edit_head_pid':
-            headPIDHandle(data['params'])
+server_loop = None
 
-    def connected(self):
-        print(self.address, 'connected')
-        clientID = self.address[1]
-        clients.update({clientID: self})
-        send_message(clientID, "device_connected", self.address)
-        send_message(clientID, "torque_control", robotIsOn)
+async def ws_handler(websocket, path):
+    client_id = id(websocket)
+    connected_clients[client_id] = websocket
 
-    def handle_close(self):
-        clients.pop(self.address)
-        print(self.address, 'closed')
-        send_message(-1, "device_disconnected", self.address)
+
+    print(client_id, 'connected')
+    send_message(client_id, "device_connected", client_id)
+    send_message(client_id, "torque_control", robotIsOn)
+
+    try:
+        while True:
+            message = await websocket.recv()
+            data = json.loads(message)
+            print(data)
+            cmd = data['cmd']
+
+            if cmd == 'torque_on':
+                startRobot()
+            elif cmd == 'torque_off':
+                setDxlTorque()
+                send_message(-1, "torque_control", False)
+            elif cmd == 'start_walk':
+                setWalkCmd("start")
+                send_message(-1, "walk_control", True)
+            elif cmd == 'stop_walk':
+                setWalkCmd("stop")
+                send_message(-1, "walk_control", False)
+            elif cmd == 'save_walk_params':
+                setWalkCmd("save")
+                send_message(-1, "walk_params_saved", True)
+            elif cmd == 'get_walk_params':
+                send_message(-1, "update_walk_params", getWalkParams())
+            elif cmd == 'set_walk_params':
+                setWalkParams(data['params'])
+                send_message(-1, "controller_msg", 'Walk params changed')
+            elif cmd == "set_walking":
+                if(client_id == walking.control):
+                    vectorDict = data['params']
+                    vector = Vector2yaw(vectorDict["x"], vectorDict["y"], vectorDict["yaw"])
+                    walking.setTarget(vector)
+            elif cmd == 'set_walking_offset':
+                walking.setWalkingOffset()
+                send_message(-1, "controller_msg", 'Walking offset changed')
+            elif cmd == 'set_walking_conf':
+                walking.setWalkingConf(data['params'])
+                send_message(-1, "controller_msg", 'Walking configuration changed')
+            elif cmd == "set_control_walking":
+                if data['params'] == 1:
+                    walking.control = client_id
+                    send_message(-1, "control_override", client_id)
+                else:
+                    walking.control = None
+                    send_message(-1, "control_override", -1)
+            elif cmd == 'get_walking_conf':
+                send_message(-1, "update_walking_conf", walking.getWalkingConf())
+            elif cmd == 'get_walking':
+                send_message(client_id, "update_walking", walking.getWalkingConf())
+            elif cmd == 'gyro_init':
+                init_gyro()
+                send_message(-1, "controller_msg", "Init gyro success")
+            elif cmd == 'head_direct':
+                headControlDirect(data['params'])
+            elif cmd == 'track_head_control':
+                headControlHandle(data['params'])
+            elif cmd == 'edit_head_pid':
+                headPIDHandle(data['params'])
+            elif cmd == 'stream_offer':
+                streamOfferHandle(data['params'], client_id)
+    finally:
+        del connected_clients[client_id]
+        print(client_id, 'closed')
+        send_message(-1, "device_disconnected", client_id)
+
+def between_callback():
+    global server_loop
+
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    server_loop = loop
+    ws_server = websockets.serve(ws_handler, '0.0.0.0', 8077)
+
+    loop.run_until_complete(ws_server)
+    loop.run_forever() # this is missing
+    loop.close()
+
+async def send_message2(websocket_con, message):
+    print('sending')
+    await websocket_con.send(message)
 
 def send_message(id, cmd, params):
+    if server == None: return
+
     resp = {
         "cmd" : cmd,
         "params" : params
     }
+    
     respJson = json.dumps(resp)
     if(id >= 0):
-        clients[id].send_message(respJson)
+        print('sendings')
+        asyncio.run_coroutine_threadsafe(send_message2(connected_clients[id], respJson), server_loop)
     else:
-        for client in clients.values():
-            client.send_message(respJson)
+        for client in connected_clients.values():
+            print('sendings')
+            asyncio.run_coroutine_threadsafe(send_message2(client, respJson), server_loop)
 
 
 
-def forever_ws(num):
-    global server
 
-    server = WebSocketServer('', 8077, WS)
-    print("Websocket is running...")
-    server.serve_forever()
-
-
-t1 = threading.Thread(target=forever_ws, args=(10,))
 
 def sendHeadControl(pitch, yaw):
     js = JointState()
@@ -223,6 +243,22 @@ def headControlHandle(data):
         ball_tracking.isEnabled = True
     elif(data["enabled"] == False):
         ball_tracking.isEnabled = False
+
+async def offering(request, client):
+    print("processing offer...")
+    
+    answer = await inference.streamer.offer(request)
+    if server == None: return
+    print("ANSWER")
+    print(answer)
+    print(type(answer))
+    
+    await send_message2(connected_clients[client], json.dumps(answer))
+    print("answer sent")
+
+def streamOfferHandle(data, client):
+    global server_loop
+    asyncio.run_coroutine_threadsafe(offering(data, client), server_loop)
 
 def headPIDHandle(data):
     ball_tracking.pid_x.tunings(data["p"], data["i"], data["d"])
@@ -306,22 +342,26 @@ def handleStatusMsg(statusMsg):
 
     send_message(-1, 'update_status', statusDict)
 
+
 def main():
+    global server
 
-
-    global lastSendParamTic
-    global track_ball
-    t1.start()
     rospy.init_node('main', anonymous=True)
 
-    #rospy.Subscriber("/robotis/open_cr/imu", Imu, handleImu)
+    server = threading.Thread(target=between_callback, daemon=True)
+    server.start()
+
+
+    # rospy.Subscriber("/robotis/open_cr/imu", Imu, handleImu)
     rospy.Subscriber("/robotis/status", StatusMsg, handleStatusMsg)
     # rospy.Subscriber("balance_monitor", String, handleBalanceMonitor)
     
     rospy.loginfo("Waiting manager...")
     global isManagerReady
-    while(isManagerReady==False): 
+    count = 0
+    while(isManagerReady==False and count < 10): 
         time.sleep(1)
+        count +=1
 
     print("controller runnning")
     rospy.loginfo("Wait for manager complete")
@@ -336,8 +376,8 @@ def main():
     else:
         rospy.loginfo("Inference Started")
 
-    val = -0.9
-    dir = 0.01
+    global lastSendParamTic
+    global track_ball
 
     while not rospy.is_shutdown():
         toc = time.time()
@@ -360,14 +400,15 @@ def main():
         #     dir = -0.1
         # if(val <= -0.9):
         #     dir = 0.1
+
+    
             
 
 
 def shutdown():
     global server
-    # inference.shutdown()
-    server.close()
-    t1.join()
+    inference.shutdown()
+    server.join()
     sys.exit()
 
 def close_sig_handler(signal, frame):

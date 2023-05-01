@@ -10,7 +10,7 @@ var bt_show_settings = document.querySelector("#bt_show_settings");
 var bt_show_manuctrl = document.querySelector("#bt_show_manuctrl");
 var bt_show_headctrl = document.querySelector("#bt_show_headctrl");
 var bt_show_pidmon = document.querySelector("#bt_show_pidmon");
-var bt_show_monitor = document.querySelector("#bt_show_monitor");
+var bt_vision_stream = document.querySelector("#bt_vision_stream");
 var bt_send_stationary = document.querySelector("#bt_send_stationary");
 var bt_submit_settings = document.querySelector("#bt_submit_settings");
 $("#"+bt_send_stationary.id).collapse("hide");
@@ -31,6 +31,7 @@ var hasControlID = -1;
 var pidMonGraph =new GraphMonitor(document.getElementById("pid_mon_graph"));
 pidMonGraph.build();
 
+var pc = null;
 
 var cmdTimeout = 3;
 
@@ -332,7 +333,7 @@ ws.onopen = function (e){
 };
 
 ws.onmessage = function (event){
-    // console.log(event.data)
+    console.log(event.data)
     var obj = JSON.parse(event.data);
     
     if(obj.cmd == null) return;
@@ -368,6 +369,10 @@ ws.onmessage = function (event){
     }if(cmd == "balance_monitor"){
         pidMonGraph.addItems(obj.params);
         pidMonGraph.updateAllLine();
+    }if(cmd == "stream_answer"){
+        console.log("its an stream answer!")
+        console.log(obj)
+        pc.setRemoteDescription(obj);
     }
 }
 
@@ -606,13 +611,62 @@ bt_get_walk_params.addEventListener("click", function(event) {
     bt_get_walk_params.classList.add("disabled");
 }, false);
 
+/// STREAMER
+
+function negotiate() {
+    pc.addTransceiver('video', {direction: 'recvonly'});
+    return pc.createOffer().then(function(offer) {
+        return pc.setLocalDescription(offer);
+    }).then(function() {
+        // wait for ICE gathering to complete
+        return new Promise(function(resolve) {
+            if (pc.iceGatheringState === 'complete') {
+                resolve();
+            } else {
+                function checkState() {
+                    if (pc.iceGatheringState === 'complete') {
+                        pc.removeEventListener('icegatheringstatechange', checkState);
+                        resolve();
+                    }
+                }
+                pc.addEventListener('icegatheringstatechange', checkState);
+            }
+        });
+
+    }).then(function() {
+        var offer = pc.localDescription;
+        var request = JSON.stringify({
+                sdp: offer.sdp,
+                type: offer.type,
+            });
+        sendParameterized("stream_offer", request);
+    });
+}
+
+function startVision(){
+    var config = {
+        sdpSemantics: 'unified-plan'
+    };
+
+    pc = new RTCPeerConnection(config);
+
+    pc.addEventListener('track', function(evt) {
+        if (evt.track.kind == 'video') {
+            document.getElementById('video').srcObject = evt.streams[0];
+        }
+    });
+
+    negotiate();
+}
+
+//// TABS
 
 var collapsibles = [
     $("#settings"),
     $("#manual_ctrl"),
     $("#head_ctrl"),
     $("#pid_mon"),
-    $("#monitor_window")
+    $("#vision_stream")
 ];
 
 var onShow = null; 
@@ -683,7 +737,7 @@ bt_show_pidmon.addEventListener("click", function(event) {
     }
 }, false);
 
-bt_show_monitor.addEventListener("click", function(event) {
+bt_vision_stream.addEventListener("click", function(event) {
     event.preventDefault();
     if(onShow == null){
         collapsibles[4].collapse("show");

@@ -14,19 +14,16 @@ from aiohttp import web
 from aiortc import RTCPeerConnection, RTCSessionDescription, VideoStreamTrack
 from aiortc.rtcrtpsender import RTCRtpSender
 
-ROOT = os.path.dirname(__file__)
+pcs = set()
 
-
-relay = None
-webcam = None
-
+video = None
 
 def gstreamer_pipeline(
     sensor_id=0,
     capture_width=640,
     capture_height=480,
-    display_width=240,
-    display_height=160,
+    display_width=480,
+    display_height=320,
     framerate=30,
     flip_method=0,
 ):
@@ -86,9 +83,10 @@ class VideoCapture:
     def store_out(self, frame):
         self.frameIn = frame
     def read_out(self):
-        temp = self.frameOut
-        self.frameOut = self.frameIn
-        return temp
+        return self.frameIn
+
+    def release(self):
+        self.cap.release()
 
 
 class VideoOpencvTrack(VideoStreamTrack):
@@ -129,18 +127,11 @@ class VideoOpencvTrack(VideoStreamTrack):
         return new_frame
 
 
-def force_codec(pc, sender, forced_codec):
-    kind = forced_codec.split("/")[0]
-    codecs = RTCRtpSender.getCapabilities(kind).codecs
-    transceiver = next(t for t in pc.getTransceivers() if t.sender == sender)
-    transceiver.setCodecPreferences(
-        [codec for codec in codecs if codec.mimeType == forced_codec]
-    )
-
-
 async def offer(request):
+    print("processing answer...")
     global video
-    params = await request.json()
+    params = request
+    print(params["sdp"])
     offer = RTCSessionDescription(sdp=params["sdp"], type=params["type"])
 
     pc = RTCPeerConnection()
@@ -161,28 +152,6 @@ async def offer(request):
     answer = await pc.createAnswer()
     await pc.setLocalDescription(answer)
 
-    return web.Response(
-        content_type="application/json",
-        text=json.dumps(
-            {"sdp": pc.localDescription.sdp, "type": pc.localDescription.type}
-        ),
-    )
+    print("remote description has been set")
 
-
-pcs = set()
-
-
-async def on_shutdown(app):
-    # close peer connections
-    coros = [pc.close() for pc in pcs]
-    await asyncio.gather(*coros)
-    pcs.clear()
-
-video = None
-
-def start(vcap):
-    app = web.Application()
-    app.on_shutdown.append(on_shutdown)
-    app.router.add_post("/offer", offer)
-    VideoOpencvTrack(vcap)
-    web.run_app(app, host="0.0.0.0", port=8090)
+    return {"cmd" : "stream_answer", "sdp": pc.localDescription.sdp, "type": pc.localDescription.type}
