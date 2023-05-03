@@ -9,8 +9,11 @@ y_i = 0.001
 x_d = 0.001
 y_d = 0.001
 
-pid_x = PID(0.4, 0.001, 0.0001, setpoint=0)
-pid_y = PID(0.23, 0.001, 0.0001, setpoint=0)
+flip_x = 1
+flip_y = -1
+
+pid_x = PID(0.4, 0.001, 0.01, setpoint=0)
+pid_y = PID(0.23, 0.001, 0.01, setpoint=0)
 
 # stall movement
 
@@ -21,8 +24,8 @@ pitch = 0.0
 yaw = 0.0
 
 errorPitch = 0.0
-out_scale_x = 0.2
-out_scale_y = 0.18
+out_scale_x = 4
+out_scale_y = 4
 
 ball_track = None
 
@@ -33,6 +36,14 @@ search_state = 0
 s_max_angle = 0.8
 s_speed = 0.03
 s_2_count = 0
+
+def reload():
+    pid_x.tunings = (x_p,x_i,x_d)
+    pid_y.tunings = (y_p,y_i,y_d)
+    print("tunings set")
+    pid_x.reset()
+    pid_y.reset()
+    print("PID reset")
 
 def track(error):
     global pid_x
@@ -56,19 +67,18 @@ def track(error):
     # yaw += max(min(-out_x, 0.1), -0.1)
 
 
-    out_x = -pid_x(error.x)*out_scale_x
+    out_x = pid_x(error.x)*out_scale_x*flip_x
+    out_y = pid_y(error.y)*out_scale_y*flip_y
 
-    out_y = -pid_y(error.y)*out_scale_y
-
-    if(search_state == 2):
-        s_2_count += 1
-        pitch += out_y * 0.1
-        yaw += out_x * 0.1
-        if(s_2_count == 13):
-            search_state = 0
-    else:
-        pitch = out_y
-        yaw = out_x
+    # if(search_state == 2):
+    #     s_2_count += 1
+    #     pitch = out_y * 0.1
+    #     yaw = out_x * 0.1
+    #     if(s_2_count == 13):
+    #         search_state = 0
+    # else:
+    pitch += out_y * 0.05
+    yaw += out_x * 0.05
 
     pitch = max(min(pitch, 1), -1)
     yaw = max(min(yaw, 1), -1)

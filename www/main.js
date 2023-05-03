@@ -391,6 +391,10 @@ function onSubmit(id){
     return false;
 }
 
+function reloadBallTrackerParams(){
+    sendCmd("reload_ball_track_conf");
+}
+
 function onSubmitHead(id){
     var el = document.getElementById(id);
     param = {

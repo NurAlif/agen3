@@ -24,8 +24,8 @@ bindings = None
 binding_addrs = None
 context = None
 
-color_ball = (255, 0, 0)
-color_goal = (0, 0, 255)
+color_ball = (0, 0, 255)
+color_goal = (255, 0, 0)
 
 
 # Infer TensorRT Engine

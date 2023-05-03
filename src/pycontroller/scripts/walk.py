@@ -15,7 +15,7 @@ import asyncio
 import threading
 import inference2 as inference
 import ball_tracking
-from configloader import read_walk_balance_conf
+from configloader import read_walk_balance_conf, read_ball_track_conf
 
 from walking import Vector2, Vector2yaw, CONTROL_MODE_HEADLESS, CONTROL_MODE_YAWMODE, Walking
 from walk_utils import joints, getWalkParamsDict, setWalkParamsConvert
@@ -129,6 +129,8 @@ async def ws_handler(websocket, path):
                 headPIDHandle(data['params'])
             elif cmd == 'stream_offer':
                 streamOfferHandle(data['params'], client_id)
+            elif cmd == 'reload_ball_track_conf':
+                reloadBallTrackerHandle()
     finally:
         del connected_clients[client_id]
         print(client_id, 'closed')
@@ -243,6 +245,22 @@ def headControlHandle(data):
         ball_tracking.isEnabled = True
     elif(data["enabled"] == False):
         ball_tracking.isEnabled = False
+
+def reloadBallTrackerHandle():
+    ball_tracking.x_p = read_ball_track_conf("PID", "x_p")
+    ball_tracking.y_p = read_ball_track_conf("PID", "y_p")
+    ball_tracking.x_i = read_ball_track_conf("PID", "x_i")
+    ball_tracking.y_i = read_ball_track_conf("PID", "y_i")
+    ball_tracking.x_d = read_ball_track_conf("PID", "x_d")
+    ball_tracking.y_d = read_ball_track_conf("PID", "y_d")
+    ball_tracking.flip_x = read_ball_track_conf("PID", "flip_x")
+    ball_tracking.flip_y = read_ball_track_conf("PID", "flip_y")
+    ball_tracking.out_scale_x = read_ball_track_conf("PID", "out_scale_x")
+    ball_tracking.out_scale_y = read_ball_track_conf("PID", "out_scale_y")
+
+    ball_tracking.reload()
+
+    send_message(-1, "controller_msg", "ball_tracking params updated!")
 
 async def offering(request, client):
     print("processing offer...")
@@ -390,11 +408,11 @@ def main():
 
         inference.detect(track_ball)
 
-        print((track_ball.x, track_ball.y))
+        # print((track_ball.x, track_ball.y))
 
         ball_tracking.track(track_ball)
         
-        # sendHeadControl(ball_tracking.pitch, ball_tracking.yaw)
+        sendHeadControl(ball_tracking.pitch, ball_tracking.yaw)
         
         # val+=dir
         # if(val >= 0.9):
