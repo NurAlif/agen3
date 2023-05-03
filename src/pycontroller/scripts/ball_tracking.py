@@ -1,8 +1,16 @@
 import math
 from simple_pid import PID
 
+
+x_p = 0.3
+y_p = 0.23
+x_i = 0.001
+y_i = 0.001
+x_d = 0.001
+y_d = 0.001
+
 pid_x = PID(0.4, 0.001, 0.0001, setpoint=0)
-pid_y = PID(0.23, 0.001, 0.0001, setpoint=0.7)
+pid_y = PID(0.23, 0.001, 0.0001, setpoint=0)
 
 # stall movement
 
@@ -59,8 +67,8 @@ def track(error):
         if(s_2_count == 13):
             search_state = 0
     else:
-        pitch += out_y
-        yaw += out_x
+        pitch = out_y
+        yaw = out_x
 
     pitch = max(min(pitch, 1), -1)
     yaw = max(min(yaw, 1), -1)

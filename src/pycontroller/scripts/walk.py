@@ -390,8 +390,9 @@ def main():
 
         inference.detect(track_ball)
 
+        print((track_ball.x, track_ball.y))
 
-        # ball_tracking.track(track_ball)
+        ball_tracking.track(track_ball)
         
         # sendHeadControl(ball_tracking.pitch, ball_tracking.yaw)
         

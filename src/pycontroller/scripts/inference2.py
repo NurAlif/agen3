@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 
+# -1 to 1
+# center is 0,0
+# right, up = +, -
+
 import cv2
 import torch
 import random
@@ -20,6 +24,8 @@ bindings = None
 binding_addrs = None
 context = None
 
+color_ball = (255, 0, 0)
+color_goal = (0, 0, 255)
 
 
 # Infer TensorRT Engine
@@ -83,12 +89,20 @@ def postprocess(boxes,r,dwdh):
     boxes /= r
     return boxes
 
-names = ['bola', 'gawang']
-colors = {name:[random.randint(0, 255) for _ in range(3)] for i,name in enumerate(names)}
+# names = ['bola':0, 'gawang':1]
 #DEF YOLO END
 
 videocap = None
 
+res = None
+
+lost_count = 0
+ball_lock = False
+
+max_lost = 120
+goto_zero_x = 0.01
+goto_zero_y = 0.01
+stop_zone = 0.20
 
 class Tracking:
     def __init__(self):
@@ -136,11 +150,59 @@ def detect(track_ball):
     boxes = boxes[0,:nums[0][0]]
     classes = classes[0,:nums[0][0]]
 
+    is_found = False
+    d_closest = 1000.0
+    closest = Tracking()
+
     for box,cl in zip(boxes,classes):
-        box = postprocess(box,ratio,dwdh).round().int()
-        name = names[cl]
-        color = colors[name]
-        cv2.rectangle(img,tuple(box[:2].tolist()),tuple(box[2:].tolist()),color,2)
+        box = postprocess(box,ratio,dwdh).round().int().tolist()
+
+        if cl == 1:
+            cv2.rectangle(img,tuple(box[:2]),tuple(box[2:]),color_goal,2)
+        else:
+            x = int((box[0] + box[2]) / 2)
+            y = int((box[1] + box[3]) / 2)
+            cv2.circle(img, (x,y), 4, color_ball, -1)
+            
+            x = (x / res[0] - 0.5) * 2
+            y = (y / res[1] - 0.5) * 2
+            
+            d_x = x - track_ball.x
+            d_y = y - track_ball.y
+
+            dist = math.sqrt((d_x*d_x) + (d_y*d_y))
+
+            if dist < d_closest:
+                d_closest = dist
+                closest.x = x
+                closest.y = y
+                is_found = True
+
+    global ball_lock
+    global lost_count
+
+    if is_found:
+        track_ball.x = closest.x
+        track_ball.y = closest.y
+        lost_count = 0
+        ball_lock = True
+    else:
+        lost_count += 1
+
+        if track_ball.x < -stop_zone:
+            track_ball.x += goto_zero_x
+        if track_ball.x > stop_zone:
+            track_ball.x -= goto_zero_x
+        if track_ball.y < -stop_zone:
+            track_ball.y += goto_zero_y
+        if track_ball.y > stop_zone:
+            track_ball.y -= goto_zero_y    
+
+        if lost_count > max_lost:
+            lost_count = max_lost
+            ball_lock = False
+            track_ball.x = 0.0
+            track_ball.y = 0.0
 
     videocap.store_out(img)
 
@@ -149,10 +211,15 @@ def startInference():
 
     global videocap
 
+    global res
+
     init_tensorrt()
     videocap = streamer.VideoCapture()
     track = streamer.VideoOpencvTrack(videocap)
     streamer.video = track
+
+    res = track.get_frame_size()
+
 
     print('inference is running...')
     return 0

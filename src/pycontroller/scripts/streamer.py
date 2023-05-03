@@ -97,6 +97,11 @@ class VideoOpencvTrack(VideoStreamTrack):
     _start: float
     _timestamp: int
 
+    def get_frame_size(self):
+        height, width, _ = self.cap.read_in().shape
+        print("frame size : ", height, ", ", width)
+        return (width, height)
+
     async def next_timestamp(self) -> Tuple[int, fractions.Fraction]:
         if self.readyState != "live":
             print("ERROR track unready!")
