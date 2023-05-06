@@ -13,6 +13,7 @@ var bt_show_pidmon = document.querySelector("#bt_show_pidmon");
 var bt_vision_stream = document.querySelector("#bt_vision_stream");
 var bt_send_stationary = document.querySelector("#bt_send_stationary");
 var bt_submit_settings = document.querySelector("#bt_submit_settings");
+var bt_load_offset = document.querySelector("#bt_load_offset");
 $("#"+bt_send_stationary.id).collapse("hide");
 
 var input_walking_turnspeed = document.querySelector("#set_walking_turnspeed");
@@ -373,6 +374,8 @@ ws.onmessage = function (event){
         console.log("its an stream answer!")
         console.log(obj)
         pc.setRemoteDescription(obj);
+    }if(cmd == "offset_updated"){
+        console.log("offset_updated!")
     }
 }
 
@@ -763,6 +766,10 @@ bt_send_stationary.addEventListener("click", function(event) {
 
 bt_submit_settings.addEventListener("click", function(event) {
     sendCmd("save_walk_params");
+}, false);
+
+bt_load_offset.addEventListener("click", function(e){
+    sendCmd("load_offest")
 }, false);
 
 
