@@ -769,7 +769,7 @@ bt_submit_settings.addEventListener("click", function(event) {
 }, false);
 
 bt_load_offset.addEventListener("click", function(e){
-    sendCmd("load_offest")
+    sendCmd("load_offset")
 }, false);
 
 

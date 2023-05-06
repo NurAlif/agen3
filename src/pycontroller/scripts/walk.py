@@ -24,7 +24,8 @@ from std_msgs.msg import String
 from robotis_controller_msgs.msg import SyncWriteItem, StatusMsg
 from op3_walking_module_msgs.msg import WalkingParam, WalkingCorrection
 from sensor_msgs.msg import Imu, JointState
-from op3_walking_module_msgs.srv import GetWalkingParam, LoadOffset
+from op3_walking_module_msgs.srv import GetWalkingParam
+from robotis_controller_msgs.srv import LoadOffset
 
     
 ###############################################################################
@@ -132,7 +133,8 @@ async def ws_handler(websocket, path):
             elif cmd == 'reload_ball_track_conf':
                 reloadBallTrackerHandle()
             elif cmd == "load_offset":
-                loadOffset(OFFSET_PATH)
+                loadOffsetHandle(OFFSET_PATH)
+
     finally:
         del connected_clients[client_id]
         print(client_id, 'closed')
@@ -311,13 +313,13 @@ def getWalkParams():
     except rospy.ServiceException as e:
         print("Service call failed: %s"%e)
 
-def loadOffset(path):
+def loadOffsetHandle(path):
     rospy.wait_for_service('/robotis/load_offset')
     try:
-        getParams = rospy.ServiceProxy('/robotis/load_offset', path)
-        resp = getParams().result
-        if resp:
-            send_message(-1, "offset_updated")
+        getParams = rospy.ServiceProxy('/robotis/load_offset', LoadOffset)
+        resp = getParams(path)
+        send_message(-1, "offset_updated", resp.result)
+        if resp.result:
             print("offset_updated")
         else:
             print("offset_fail")
