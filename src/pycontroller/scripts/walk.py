@@ -21,12 +21,10 @@ from walking import Vector2, Vector2yaw, CONTROL_MODE_HEADLESS, CONTROL_MODE_YAW
 from walk_utils import joints, getWalkParamsDict, setWalkParamsConvert
 
 from std_msgs.msg import String
-from robotis_controller_msgs.msg import SyncWriteItem
-from robotis_controller_msgs.msg import StatusMsg
-from op3_walking_module_msgs.msg import WalkingParam
-from op3_walking_module_msgs.msg import WalkingCorrection
+from robotis_controller_msgs.msg import SyncWriteItem, StatusMsg
+from op3_walking_module_msgs.msg import WalkingParam, WalkingCorrection
 from sensor_msgs.msg import Imu, JointState
-from op3_walking_module_msgs.srv import GetWalkingParam
+from op3_walking_module_msgs.srv import GetWalkingParam, LoadOffset
 
     
 ###############################################################################
@@ -38,6 +36,8 @@ pubWalkCmd = rospy.Publisher('/robotis/walking/command', String, queue_size=10)
 pubSetParams = rospy.Publisher('/robotis/walking/set_params', WalkingParam, queue_size=10)
 pubWalkCorr = rospy.Publisher('walking_correction', WalkingCorrection, queue_size=10)
 pubHeadControl = rospy.Publisher('/robotis/head_control/set_joint_states', JointState, queue_size=1)
+
+OFFSET_PATH = "/home/name/agen3/src/ROBOTIS-OP3/op3_tuning_module/data/offset.yaml"
 
 currentWalkParams = None # ? params
 walkParams = None
@@ -131,6 +131,8 @@ async def ws_handler(websocket, path):
                 streamOfferHandle(data['params'], client_id)
             elif cmd == 'reload_ball_track_conf':
                 reloadBallTrackerHandle()
+            elif cmd == "load_offset":
+                loadOffset(OFFSET_PATH)
     finally:
         del connected_clients[client_id]
         print(client_id, 'closed')
@@ -306,6 +308,19 @@ def getWalkParams():
         paramsDict = getWalkParamsDict(params)
         currentWalkParams = paramsDict
         return paramsDict
+    except rospy.ServiceException as e:
+        print("Service call failed: %s"%e)
+
+def loadOffset(path):
+    rospy.wait_for_service('/robotis/load_offset')
+    try:
+        getParams = rospy.ServiceProxy('/robotis/load_offset', path)
+        resp = getParams().result
+        if resp:
+            send_message(-1, "offset_updated")
+            print("offset_updated")
+        else:
+            print("offset_fail")
     except rospy.ServiceException as e:
         print("Service call failed: %s"%e)
 
