@@ -650,6 +650,10 @@ function negotiate() {
     });
 }
 
+function load_walking_conf(){
+    sendParameterized("load_walking_conf", request);
+}
+
 function startVision(){
     var config = {
         sdpSemantics: 'unified-plan'

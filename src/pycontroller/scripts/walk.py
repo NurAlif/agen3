@@ -15,7 +15,8 @@ import asyncio
 import threading
 import inference2 as inference
 import ball_tracking
-from configloader import read_walk_balance_conf, read_ball_track_conf
+import chaser
+from configloader import read_walk_balance_conf, read_ball_track_conf, read_walking_conf
 
 from walking import Vector2, Vector2yaw, CONTROL_MODE_HEADLESS, CONTROL_MODE_YAWMODE, Walking
 from walk_utils import joints, getWalkParamsDict, setWalkParamsConvert
@@ -136,6 +137,8 @@ async def ws_handler(websocket, path):
                 loadOffsetHandle(OFFSET_PATH)
             elif cmd == "chaser":
                 chaserHandle(data['params'])
+            elif cmd == "load_walking_conf":
+                handleLoadWalkingConf()
 
     finally:
         del connected_clients[client_id]
@@ -188,7 +191,7 @@ def sendHeadControl(pitch, yaw):
     pubHeadControl.publish(js)
 
 def sendWithWalkParams():
-    if(walking.control == None): return
+    if(walking.control == None or not chaser.enabled): return
     
     global walkParams
     global pubSetParams
@@ -328,10 +331,28 @@ def loadOffsetHandle(path):
     except rospy.ServiceException as e:
         print("Service call failed: %s"%e)
 
+def handleLoadWalkingConf():
+    walking.max_speed = read_ball_track_conf("common", "max_speed")
+    walking.feed_rate = read_ball_track_conf("common", "feed_rate")
+    walking.stationary_offset.x = read_ball_track_conf("stationary_offset", "x")
+    walking.stationary_offset.y = read_ball_track_conf("stationary_offset", "y")
+    walking.stationary_offset.yaw = read_ball_track_conf("stationary_offset", "yaw")
+    walking.step.x = read_ball_track_conf("step", "x")
+    walking.step.y = read_ball_track_conf("step", "y")
+    walking.step.yaw = read_ball_track_conf("step", "yaw")
+    walking.vectorMultiplier.x = read_ball_track_conf("vector_multipler", "x")
+    walking.vectorMultiplier.y = read_ball_track_conf("vector_multipler", "y")
+    walking.vectorMultiplier.yaw = read_ball_track_conf("vector_multipler", "yaw")
+
+    send_message(-1, "controller_msg", "walking params updated!")
+
 def chaserHandle(params):
     if params.cmd == "start":
-        
+        chaser.enabled = True
+        send_message(-1, "controller_msg", "walking_module_enabled")
     elif params.cmd == "stop":
+        chaser.enabled = False
+        send_message(-1, "controller_msg", "walking_module_disabled")
         
 
 def init_gyro():
