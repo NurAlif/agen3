@@ -134,6 +134,8 @@ async def ws_handler(websocket, path):
                 reloadBallTrackerHandle()
             elif cmd == "load_offset":
                 loadOffsetHandle(OFFSET_PATH)
+            elif cmd == "chaser":
+                chaserHandle(data['params'])
 
     finally:
         del connected_clients[client_id]
@@ -326,6 +328,12 @@ def loadOffsetHandle(path):
     except rospy.ServiceException as e:
         print("Service call failed: %s"%e)
 
+def chaserHandle(params):
+    if params.cmd == "start":
+        
+    elif params.cmd == "stop":
+        
+
 def init_gyro():
     init_gyro_msg = SyncWriteItem()
     init_gyro_msg.item_name = "imu_control"
@@ -420,8 +428,8 @@ def main():
         if(delta_t > SEND_PARAM_INTERVAL):
             lastSendParamTic = toc
 
-            # walking.stepToTargetVel()
-            # sendWithWalkParams()
+            walking.stepToTargetVel()
+            sendWithWalkParams()
 
         inference.detect(track_ball)
 
