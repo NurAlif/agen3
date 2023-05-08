@@ -76,7 +76,7 @@ async def ws_handler(websocket, path):
         while True:
             message = await websocket.recv()
             data = json.loads(message)
-            print(data)
+            # print(data)
             cmd = data['cmd']
 
             if cmd == 'torque_on':
@@ -111,6 +111,7 @@ async def ws_handler(websocket, path):
                 send_message(-1, "controller_msg", 'Walking configuration changed')
             elif cmd == "set_control_walking":
                 if data['params'] == 1:
+                    print("walking controll has been set!!")
                     walking.control = client_id
                     send_message(-1, "control_override", client_id)
                 else:
@@ -191,8 +192,8 @@ def sendHeadControl(pitch, yaw):
     pubHeadControl.publish(js)
 
 def sendWithWalkParams():
-    if(walking.control == None or not chaser.enabled): return
-    
+    if walking.control == None and not chaser.enabled: return
+
     global walkParams
     global pubSetParams
     walkParams.x_move_amplitude = walking.vectorCurrent.y
@@ -204,6 +205,7 @@ def sendWithWalkParams():
         walkParams.y_move_amplitude = 0.0
     
     pubSetParams.publish(walkParams)
+    print("params set")
     send_message(-1, "update_walking", walking.getWalkingCurrent())
 
 def enableWalk():
@@ -332,17 +334,17 @@ def loadOffsetHandle(path):
         print("Service call failed: %s"%e)
 
 def handleLoadWalkingConf():
-    walking.max_speed = read_ball_track_conf("common", "max_speed")
-    walking.feed_rate = read_ball_track_conf("common", "feed_rate")
-    walking.stationary_offset.x = read_ball_track_conf("stationary_offset", "x")
-    walking.stationary_offset.y = read_ball_track_conf("stationary_offset", "y")
-    walking.stationary_offset.yaw = read_ball_track_conf("stationary_offset", "yaw")
-    walking.step.x = read_ball_track_conf("step", "x")
-    walking.step.y = read_ball_track_conf("step", "y")
-    walking.step.yaw = read_ball_track_conf("step", "yaw")
-    walking.vectorMultiplier.x = read_ball_track_conf("vector_multipler", "x")
-    walking.vectorMultiplier.y = read_ball_track_conf("vector_multipler", "y")
-    walking.vectorMultiplier.yaw = read_ball_track_conf("vector_multipler", "yaw")
+    walking.max_speed = read_walking_conf("common", "max_speed")
+    walking.feed_rate = read_walking_conf("common", "feed_rate")
+    walking.stationary_offset.x = read_walking_conf("stationary_offset", "x")
+    walking.stationary_offset.y = read_walking_conf("stationary_offset", "y")
+    walking.stationary_offset.yaw = read_walking_conf("stationary_offset", "yaw")
+    walking.step.x = read_walking_conf("step", "x")
+    walking.step.y = read_walking_conf("step", "y")
+    walking.step.yaw = read_walking_conf("step", "yaw")
+    walking.vectorMultiplier.x = read_walking_conf("vector_multipler", "x")
+    walking.vectorMultiplier.y = read_walking_conf("vector_multipler", "y")
+    walking.vectorMultiplier.yaw = read_walking_conf("vector_multipler", "yaw")
 
     send_message(-1, "controller_msg", "walking params updated!")
 
@@ -433,6 +435,9 @@ def main():
     startRobot()
 
     time.sleep(5)
+
+    reloadBallTrackerHandle()
+    handleLoadWalkingConf()
 
     if(inference.startInference() < 0):
         rospy.loginfo("Inference Start ERROR")

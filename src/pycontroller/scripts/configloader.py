@@ -43,7 +43,7 @@ def read_ball_track_conf(group, item):
 
 def read_walking_conf(group, item):
     walking_parser = configparser.ConfigParser()   
-    walking_parser.read(walk_balance_conf_path)
+    walking_parser.read(walking_conf_path)
 
     print("read conf data "+ item +" : ")
     data = float(walking_parser[group][item])
