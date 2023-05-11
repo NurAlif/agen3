@@ -1901,11 +1901,16 @@ void ActionEditor::goCmd_2(int index)
       return;
     }
   }
+  printCmd("pass init param");
 
   ctrl_->startTimer();
   ros::Duration(0.03).sleep(); // waiting for timer start
 
+  printCmd("wait timer done");
+
   BaseModule *base_module = BaseModule::getInstance();
+
+  printCmd("base module found");
 
   //make map, key : joint_name, value : joint_init_pos_rad;
   std::map<std::string, double> go_pose;
@@ -1916,6 +1921,7 @@ void ActionEditor::goCmd_2(int index)
   {
     int id = it->first;
     std::string joint_name = joint_id_to_name_[id];
+    printCmd("anu"+id);
     if (page_.step[index].position[id] & action_file_define::INVALID_BIT_MASK)
     {
       printCmd("Exist invalid joint value");
@@ -1925,6 +1931,7 @@ void ActionEditor::goCmd_2(int index)
     double goal_position = convert4095ToRadPosition(id, page_.step[index].position[id]);
     go_pose[joint_name] = goal_position;
   }
+  printCmd("make map done");
 
   // move time : 5.0 sec
   base_module->poseGenerateProc(go_pose);

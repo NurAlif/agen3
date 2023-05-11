@@ -140,6 +140,12 @@ async def ws_handler(websocket, path):
                 chaserHandle(data['params'])
             elif cmd == "load_walking_conf":
                 handleLoadWalkingConf()
+            elif cmd == "enable_ball_track": 
+                walking.isEnabled = True
+                send_message(-1, "controller_msg", "Ball tracking ENABLED")
+            elif cmd == "disable_ball_track":
+                walking.isEnabled = False
+                send_message(-1, "controller_msg", "Ball tracking disabled")
 
     finally:
         del connected_clients[client_id]
@@ -268,6 +274,10 @@ def reloadBallTrackerHandle():
     ball_tracking.flip_y = read_ball_track_conf("PID", "flip_y")
     ball_tracking.out_scale_x = read_ball_track_conf("PID", "out_scale_x")
     ball_tracking.out_scale_y = read_ball_track_conf("PID", "out_scale_y")
+    ball_tracking.max_pitch = read_ball_track_conf("PID", "max_pitch")
+    ball_tracking.min_pitch = read_ball_track_conf("PID", "min_pitch")
+    ball_tracking.max_yaw = read_ball_track_conf("PID", "max_yaw")
+    ball_tracking.min_yaw = read_ball_track_conf("PID", "min_yaw")
 
     ball_tracking.reload()
 
@@ -461,9 +471,9 @@ def main():
 
         # print((track_ball.x, track_ball.y))
 
-        ball_tracking.track(track_ball)
-        
-        sendHeadControl(ball_tracking.pitch, ball_tracking.yaw)
+        if ball_tracking.isEnabled:
+            ball_tracking.track(track_ball)
+            sendHeadControl(ball_tracking.pitch, ball_tracking.yaw)
         
         # val+=dir
         # if(val >= 0.9):

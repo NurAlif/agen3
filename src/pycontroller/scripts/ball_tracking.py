@@ -1,7 +1,6 @@
 import math
 from simple_pid import PID
 
-
 x_p = 0.3
 y_p = 0.23
 x_i = 0.001
@@ -26,6 +25,11 @@ yaw = 0.0
 errorPitch = 0.0
 out_scale_x = 4
 out_scale_y = 4
+
+max_pitch = 1
+min_pitch = -0.5
+max_yaw = 1.5
+min_yaw = -1.5
 
 ball_track = None
 
@@ -77,11 +81,11 @@ def track(error):
     #     if(s_2_count == 13):
     #         search_state = 0
     # else:
-    pitch += out_y * 0.05
-    yaw += out_x * 0.05
+    pitch += out_y * 0.1
+    yaw += out_x * 0.1
 
-    pitch = max(min(pitch, 1), -1)
-    yaw = max(min(yaw, 1), -1)
+    pitch = max(min(pitch, max_pitch), min_pitch)
+    yaw = max(min(yaw, max_yaw), min_yaw)
 
 def search():
     global search_state

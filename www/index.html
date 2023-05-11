@@ -440,7 +440,11 @@
         </div>
 
         <div id="vision_stream" class="collapse py-3">
-            <button id="start_vision" onclick="startVision()" type="button"
+            <button id="start_vision" onclick="startVision()" type="button" 
+                            class="btn btn-success btn-md">Start</button>
+            <button id="enable_ball_track_btn" onclick="sendCmd('enable_ball_track');" type="button"
+                            class="btn btn-success btn-md">Start</button>
+            <button id="disable_ball_track_btn"onclick="sendCmd('disable_ball_track');" type="button"
                             class="btn btn-success btn-md">Start</button>
             <button id="reload_ball_tracker_params" onclick="reloadBallTrackerParams()" type="button"
                             class="btn btn-success btn-md">Reload ball tracker params</button>
