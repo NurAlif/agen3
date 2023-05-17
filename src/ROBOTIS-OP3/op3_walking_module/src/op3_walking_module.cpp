@@ -995,6 +995,12 @@ void WalkingModule::sensoryFeedback(const double &rlGyroErr, const double &fbGyr
       * rlGyroErr * walking_param_.balance_ankle_roll_gain;  // R_ANKLE_ROLL
   balance_angle[joint_table_["l_ank_roll"]] = - op3_kd_->getJointDirection("l_ank_roll") * internal_gain
       * rlGyroErr * walking_param_.balance_ankle_roll_gain;  // L_ANKLE_ROLL
+  
+  // balance_angle[joint_table_["r_sho_pitch"]] = - op3_kd_->getJointDirection("r_sho_pitch") * internal_gain
+  //     * rlGyroErr * 5;  // R_ANKLE_ROLL
+  // balance_angle[joint_table_["l_sho_pitch"]] = - op3_kd_->getJointDirection("l_sho_pitch") * internal_gain
+  //     * rlGyroErr * 5;  // L_ANKLE_ROLL
+  
 
 }
 

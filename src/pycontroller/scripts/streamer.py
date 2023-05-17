@@ -19,8 +19,6 @@ pcs = set()
 
 video = None
 
-record = True
-
 def gstreamer_pipeline(
     sensor_id=0,
     capture_width=640,
@@ -60,13 +58,24 @@ VIDEO_TIME_BASE = fractions.Fraction(1, VIDEO_CLOCK_RATE)
 class VideoCapture:
 
     def __init__(self):
+        self.record = True
+        
         self.frameOut = None
         self.frameIn = None
         self.cap = cv2.VideoCapture(gstreamer_pipeline(), cv2.CAP_GSTREAMER)
 
         # RECORDER
-        if record:
-            self.out = cv2.VideoWriter('/home/name/anuoutpy.avi',cv2.VideoWriter_fourcc(*'MJPG'), 30, (frame_width,frame_height))
+        if self.record:
+            latest = 0
+
+            dir_path = r'/home/name/records'
+            for path in os.scandir(dir_path):
+                if path.is_file():
+                    current = int(path.name[0:-4])
+                    if current > latest:
+                        latest = current
+
+            self.out = cv2.VideoWriter('/home/name/records/'+str(latest+1)+'.avi',cv2.VideoWriter_fourcc(*'MJPG'), 30, (frame_width,frame_height))
 
         self.q = queue.Queue()
         t = threading.Thread(target=self._reader)
@@ -90,7 +99,7 @@ class VideoCapture:
         return self.q.get()
     def store_out(self, frame):
         self.frameIn = frame
-        if record:
+        if self.record:
             self.out.write(frame)
     def read_out(self):
         return self.frameIn

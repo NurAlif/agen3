@@ -401,8 +401,8 @@ function reloadBallTrackerParams(){
 function onSubmitHead(id){
     var el = document.getElementById(id);
     param = {
-        "yaw" : document.getElementById("head_yaw"),
-        "pitch" : document.getElementById("head_pitch")
+        "yaw" : parseFloat(document.getElementById("head_yaw").value),
+        "pitch" : parseFloat(document.getElementById("head_pitch").value)
     }
 
     sendParameterized("head_direct", JSON.stringify(param));

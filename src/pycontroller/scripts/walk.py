@@ -278,6 +278,8 @@ def reloadBallTrackerHandle():
     ball_tracking.min_pitch = read_ball_track_conf("PID", "min_pitch")
     ball_tracking.max_yaw = read_ball_track_conf("PID", "max_yaw")
     ball_tracking.min_yaw = read_ball_track_conf("PID", "min_yaw")
+    ball_tracking.zero_offset_x = read_ball_track_conf("PID", "zero_offset_x")
+    ball_tracking.zero_offset_y = read_ball_track_conf("PID", "zero_offset_y")
 
     ball_tracking.reload()
 
@@ -473,7 +475,7 @@ def main():
 
         if ball_tracking.isEnabled:
             ball_tracking.track(track_ball)
-            sendHeadControl(ball_tracking.pitch, ball_tracking.yaw)
+            #sendHeadControl(ball_tracking.pitch, ball_tracking.yaw)
         
         # val+=dir
         # if(val >= 0.9):
