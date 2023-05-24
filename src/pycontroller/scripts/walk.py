@@ -16,10 +16,13 @@ import threading
 import inference2 as inference
 import ball_tracking
 import chaser
+import goaltracker
+
 from configloader import read_walk_balance_conf, read_ball_track_conf, read_walking_conf
 
 from walking import Vector2, Vector2yaw, CONTROL_MODE_HEADLESS, CONTROL_MODE_YAWMODE, Walking
 from walk_utils import joints, getWalkParamsDict, setWalkParamsConvert
+
 
 from std_msgs.msg import String
 from robotis_controller_msgs.msg import SyncWriteItem, StatusMsg
@@ -51,6 +54,10 @@ walking_module_enabled = False
 
 walking = Walking()
 track_ball = inference.Tracking()
+
+dets = inference.Detection()
+
+goaltracker.frame_size = (inference.streamer.frame_width, inference.streamer.frame_height)
 
 clients = {}
 
@@ -459,6 +466,11 @@ def main():
 
     global lastSendParamTic
     global track_ball
+    global dets
+
+    last_goal_scan = 0.0
+    goal_scan_interval = 5.0 
+    scaning = True
 
     while not rospy.is_shutdown():
         toc = time.time()
@@ -469,7 +481,17 @@ def main():
             walking.stepToTargetVel()
             sendWithWalkParams()
 
-        inference.detect(track_ball)
+        inference.detect(track_ball, dets)
+
+        if(toc - last_goal_scan >= goal_scan_interval):
+            # scaning = not scaning
+            last_goal_scan = toc
+
+        if(scaning):
+
+            goaltracker.scan(dets.goals)
+            sendHeadControl(goaltracker.scan_tilt, goaltracker.current_pos)
+
 
         # print((track_ball.x, track_ball.y))
 

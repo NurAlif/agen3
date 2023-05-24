@@ -96,11 +96,14 @@ class VideoCapture:
             self.q.put(frame)
 
     def read_in(self):
-        return self.q.get()
-    def store_out(self, frame):
-        self.frameIn = frame
+        frame = self.q.get()
         if self.record:
             self.out.write(frame)
+        return frame
+    def store_out(self, frame):
+        self.frameIn = frame
+        # if self.record:
+        #     self.out.write(frame)
     def read_out(self):
         return self.frameIn
 
