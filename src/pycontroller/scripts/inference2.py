@@ -160,7 +160,7 @@ def detect(track_ball, dets):
     d_closest = 1000.0
     closest = Tracking()
 
-    unclustered_goals = []
+    detected_goals = []
 
     for box,cl in zip(boxes,classes):
         box = postprocess(box,ratio,dwdh).round().int().tolist()
@@ -169,7 +169,7 @@ def detect(track_ball, dets):
             cv2.rectangle(img,tuple(box[:2]),tuple(box[2:]),color_goal,2)
             x = int((box[0] + box[2]) / 2)
             y = int((box[1] + box[3]) / 2)
-            unclustered_goals.append([x,y])
+            detected_goals.append([x,y])
         else:
             x = int((box[0] + box[2]) / 2)
             y = int((box[1] + box[3]) / 2)
@@ -190,7 +190,7 @@ def detect(track_ball, dets):
                 is_found = True
 
     # goal processing
-    dets.goals = unclustered_goals
+    dets.goals += detected_goals
 
     # ball processing
     global ball_lock

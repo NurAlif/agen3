@@ -33,7 +33,7 @@ var pidMonGraph =new GraphMonitor(document.getElementById("pid_mon_graph"));
 pidMonGraph.build();
 var goal_detection =new GoalDetection(document.getElementById("goal_detection"));
 goal_detection.build();
-goal_detection.addDet(1);
+// goal_detection.addDet(1);
 // goal_detection.addDet(-1);
 // goal_detection.addDet(0);
 
@@ -350,6 +350,10 @@ ws.onmessage = function (event){
     }
     if(cmd == "update_walking"){
         updateWalking(obj.params);
+    }
+    if(cmd == "goal_scan_update"){
+        goal_detection.updateGoalScan(obj.params);
+        
     }
     if(cmd == "update_walking_conf"){
         updateWalkingConf(obj.params);

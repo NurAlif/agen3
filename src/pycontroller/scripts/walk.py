@@ -477,7 +477,6 @@ def main():
         delta_t = toc - lastSendParamTic
         if(delta_t > SEND_PARAM_INTERVAL):
             lastSendParamTic = toc
-
             walking.stepToTargetVel()
             sendWithWalkParams()
 
@@ -489,8 +488,16 @@ def main():
 
         if(scaning):
 
-            goaltracker.scan(dets.goals)
-            sendHeadControl(goaltracker.scan_tilt, goaltracker.current_pos)
+            goaltracker.scan(dets)
+
+            if(goaltracker.state == goaltracker.SCAN_DONE):
+                statusDict = {
+                    'dets':goaltracker.unclustered_goals
+                } 
+
+                send_message(-1, 'goal_scan_update', statusDict)
+
+        sendHeadControl(goaltracker.scan_tilt, goaltracker.current_pos)
 
 
         # print((track_ball.x, track_ball.y))
