@@ -7,8 +7,8 @@ control_cycle = 8   # milliseconds
 
 [ device info ]
 # TYPE    | PORT NAME    | ID  | MODEL          | PROTOCOL | DEV NAME       | BULK READ ITEMS
-dynamixel | /dev/ttyUSB0 | 1   | MX-28          | 2.0      | r_sho_pitch    | present_position, position_p_gain, position_i_gain, position_d_gain
-dynamixel | /dev/ttyUSB0 | 2   | MX-28          | 2.0      | l_sho_pitch    | present_position, position_p_gain, position_i_gain, position_d_gain
+dynamixel | /dev/ttyUSB0 | 1   | MX-64          | 2.0      | r_sho_pitch    | present_position, position_p_gain, position_i_gain, position_d_gain
+dynamixel | /dev/ttyUSB0 | 2   | MX-64          | 2.0      | l_sho_pitch    | present_position, position_p_gain, position_i_gain, position_d_gain
 dynamixel | /dev/ttyUSB0 | 3   | MX-28          | 2.0      | r_sho_roll     | present_position, position_p_gain, position_i_gain, position_d_gain
 dynamixel | /dev/ttyUSB0 | 4   | MX-28          | 2.0      | l_sho_roll     | present_position, position_p_gain, position_i_gain, position_d_gain
 dynamixel | /dev/ttyUSB0 | 5   | MX-28          | 2.0      | r_el           | present_position, position_p_gain, position_i_gain, position_d_gain

@@ -16,10 +16,13 @@ import threading
 import inference2 as inference
 import ball_tracking
 import chaser
+import goaltracker
+
 from configloader import read_walk_balance_conf, read_ball_track_conf, read_walking_conf
 
 from walking import Vector2, Vector2yaw, CONTROL_MODE_HEADLESS, CONTROL_MODE_YAWMODE, Walking
 from walk_utils import joints, getWalkParamsDict, setWalkParamsConvert
+
 
 from std_msgs.msg import String
 from robotis_controller_msgs.msg import SyncWriteItem, StatusMsg
@@ -51,6 +54,10 @@ walking_module_enabled = False
 
 walking = Walking()
 track_ball = inference.Tracking()
+
+dets = inference.Detection()
+
+goaltracker.frame_size = (inference.streamer.frame_width, inference.streamer.frame_height)
 
 clients = {}
 
@@ -140,6 +147,12 @@ async def ws_handler(websocket, path):
                 chaserHandle(data['params'])
             elif cmd == "load_walking_conf":
                 handleLoadWalkingConf()
+            elif cmd == "enable_ball_track": 
+                walking.isEnabled = True
+                send_message(-1, "controller_msg", "Ball tracking ENABLED")
+            elif cmd == "disable_ball_track":
+                walking.isEnabled = False
+                send_message(-1, "controller_msg", "Ball tracking disabled")
 
     finally:
         del connected_clients[client_id]
@@ -268,6 +281,12 @@ def reloadBallTrackerHandle():
     ball_tracking.flip_y = read_ball_track_conf("PID", "flip_y")
     ball_tracking.out_scale_x = read_ball_track_conf("PID", "out_scale_x")
     ball_tracking.out_scale_y = read_ball_track_conf("PID", "out_scale_y")
+    ball_tracking.max_pitch = read_ball_track_conf("PID", "max_pitch")
+    ball_tracking.min_pitch = read_ball_track_conf("PID", "min_pitch")
+    ball_tracking.max_yaw = read_ball_track_conf("PID", "max_yaw")
+    ball_tracking.min_yaw = read_ball_track_conf("PID", "min_yaw")
+    ball_tracking.zero_offset_x = read_ball_track_conf("PID", "zero_offset_x")
+    ball_tracking.zero_offset_y = read_ball_track_conf("PID", "zero_offset_y")
 
     ball_tracking.reload()
 
@@ -447,23 +466,45 @@ def main():
 
     global lastSendParamTic
     global track_ball
+    global dets
+
+    last_goal_scan = 0.0
+    goal_scan_interval = 5.0 
+    scaning = True
 
     while not rospy.is_shutdown():
         toc = time.time()
         delta_t = toc - lastSendParamTic
         if(delta_t > SEND_PARAM_INTERVAL):
             lastSendParamTic = toc
-
             walking.stepToTargetVel()
             sendWithWalkParams()
 
-        inference.detect(track_ball)
+        inference.detect(track_ball, dets)
+
+        if(toc - last_goal_scan >= goal_scan_interval):
+            # scaning = not scaning
+            last_goal_scan = toc
+
+        if(scaning):
+
+            goaltracker.scan(dets)
+
+            if(goaltracker.state == goaltracker.SCAN_DONE):
+                statusDict = {
+                    'dets':goaltracker.unclustered_goals
+                } 
+
+                send_message(-1, 'goal_scan_update', statusDict)
+
+        sendHeadControl(goaltracker.scan_tilt, goaltracker.current_pos)
+
 
         # print((track_ball.x, track_ball.y))
 
-        ball_tracking.track(track_ball)
-        
-        sendHeadControl(ball_tracking.pitch, ball_tracking.yaw)
+        if ball_tracking.isEnabled:
+            ball_tracking.track(track_ball)
+            #sendHeadControl(ball_tracking.pitch, ball_tracking.yaw)
         
         # val+=dir
         # if(val >= 0.9):

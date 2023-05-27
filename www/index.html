@@ -415,20 +415,20 @@
                 <div class="input-group-prepend">
                     <span class="input-group-text bg-secondary text-light" id="inputGroup-sizing-default">Yaw</span>
                 </div>
-                <input id="head_yaw" type="number" class="form-control bg-dark text-light walking-conf" aria-label="Default" value="0.0"
+                <input id="head_yaw" type="number" class="form-control bg-dark text-light" aria-label="Default" value="0.0"
                     aria-describedby="inputGroup-sizing-default">
                 <div class="input-group-append">
-                    <button onclick='onSubmitHead("head_yaw")' class="btn btn-outline-light walking-conf" type="button">Submit</button>
+                    <button onclick='onSubmitHead("head_yaw")' class="btn btn-outline-light" type="button">Submit</button>
                 </div>
             </div>
             <div class="input-group mb-3">
                 <div class="input-group-prepend">
                     <span class="input-group-text bg-secondary text-light" id="inputGroup-sizing-default">Pitch</span>
                 </div>
-                <input id="head_pitch" type="number" class="form-control bg-dark text-light walking-conf" aria-label="Default" value="0.0"
+                <input id="head_pitch" type="number" class="form-control bg-dark text-light" aria-label="Default" value="0.0"
                     aria-describedby="inputGroup-sizing-default">
                 <div class="input-group-append">
-                    <button onclick='onSubmitHead("head_pitch")' class="btn btn-outline-light walking-conf" type="button">Submit</button>
+                    <button onclick='onSubmitHead("head_pitch")' class="btn btn-outline-light" type="button">Submit</button>
                 </div>
             </div>
         </div>
@@ -440,13 +440,24 @@
         </div>
 
         <div id="vision_stream" class="collapse py-3">
-            <button id="start_vision" onclick="startVision()" type="button"
-                            class="btn btn-success btn-md">Start</button>
-            <button id="reload_ball_tracker_params" onclick="reloadBallTrackerParams()" type="button"
-                            class="btn btn-success btn-md">Reload ball tracker params</button>
-            <button id="load_walking_conf" onclick="load_walking_conf()" type="button"
-                            class="btn btn-success btn-md">Load Walking Conf</button>
-            <video id="video" style="width: 500px" autoplay="true" playsinline="true"></video>
+            <div class="row">
+                <button id="start_vision" onclick="startVision()" type="button" 
+                                class="btn btn-success btn-md">Start</button>
+                <button id="enable_ball_track_btn" onclick="sendCmd('enable_ball_track');" type="button"
+                                class="btn btn-success btn-md">enable_ball_track</button>
+                <button id="disable_ball_track_btn"onclick="sendCmd('disable_ball_track');" type="button"
+                                class="btn btn-success btn-md">disable_ball_track</button>
+                <button id="reload_ball_tracker_params" onclick="reloadBallTrackerParams()" type="button"
+                                class="btn btn-success btn-md">Reload ball tracker params</button>
+                <button id="load_walking_conf" onclick="load_walking_conf()" type="button"
+                                class="btn btn-success btn-md">Load Walking Conf</button>
+            </div>
+            <div class="row">
+                <div style="background-color: blue;">
+                    <video id="video" style="width: 500px" autoplay="true" playsinline="true"></video>
+                </div>
+                <canvas id="goal_detection" width="300" style="border:1px solid #000000;"></canvas>
+            </div>
             
         </div>
     </div>
@@ -499,6 +510,7 @@
     <script type="text/javascript" src="analog.js"></script>
     <script type="text/javascript" src="keyboard.js"></script>
     <script type="text/javascript" src="pidmonitor.js"></script>
+    <script type="text/javascript" src="goaldetection.js"></script>
     <script type="text/javascript" src="main.js"></script>
 </body>
 
