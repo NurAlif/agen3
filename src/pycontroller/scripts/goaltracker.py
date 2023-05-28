@@ -26,7 +26,7 @@ head_pan = 0
 scan_tilt = 0.6
 scan_subdivision = 6
 
-min_scan = -1.5
+min_scan = -1.5 # -90 deg
 max_scan = 1.5
 scan_pos = -1
 
@@ -48,12 +48,14 @@ unclustered_goals = []
 
 class Goal:
     def __init__(self):
-        self.x = 0.0
-        self.theta = 0.0
+        self.theta = 0.0  #which angle goal detected
+        self.grad = 0.0  #left-right gradient
+        self.span = 1.0  #left-right span 
         self.found = False
-    def setall(self, _x, _theta, _found):
-        self.x = _x
+    def setall(self, _theta, _grad, _span, _found):
         self.theta = _theta
+        self.grad = _grad
+        self.span = _span
         self.found = _found
 
 goal = Goal()
@@ -121,15 +123,23 @@ def track(unclustered_goals):
     left = []
     right = []
 
+    left_count = 0
+    right_count = 0
+
     for goal in np_goals.tolist():
         if goal[0] > mid:
             right.append(goal[1])
+            right_count += 1
         else:
             left.append(goal[1])
+            left_count += 1
+
 
     if len(left)>0 and len(right)>0:
-        goal.setall(mid, 0.0, True)
+        mean_left = np.mean(np.array(left), axis=0)
+        mean_right = np.mean(np.array(right), axis=0)
+
+        delta = mean_right-mean_left
+
+        goal.setall(mid, delta[1], delta[0], True)
     else: goal.found = False
-    print(mid)
-    for i in np_goals:
-        print(i) 
