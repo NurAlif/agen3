@@ -17,6 +17,7 @@ import inference2 as inference
 import ball_tracking
 import chaser
 import goaltracker
+import proto_localization as localize
 
 from configloader import read_walk_balance_conf, read_ball_track_conf, read_walking_conf
 
@@ -492,7 +493,9 @@ def main():
 
             if(goaltracker.state == goaltracker.SCAN_DONE):
                 statusDict = {
-                    'dets':goaltracker.unclustered_goals
+                    'dets': goaltracker.unclustered_goals,
+                    'center': dets.theta,
+                    'found': dets.found
                 } 
 
                 send_message(-1, 'goal_scan_update', statusDict)

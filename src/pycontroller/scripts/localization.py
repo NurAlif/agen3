@@ -26,4 +26,6 @@ def locallize_from_goal(goal):
     alpha = goal.grad * grad_to_alpha
     beta = goal.theta * theta_to_beta
     
+def walk():
+    print()
 

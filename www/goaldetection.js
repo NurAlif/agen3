@@ -33,12 +33,12 @@ var GoalDetection = function(el){
         }
         
     },
-    this.addDet = function(pos){
+    this.addDet = function(pos, width, color){
         var ctx = this.canvas.getContext("2d");
         ctx.beginPath();
 
-        ctx.strokeStyle = "rgba(255, 100, 100, 1)";
-        ctx.lineWidth = 1;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = width;
         
         let circlepoint = Math.PI/2*(pos*(2/3))+Math.PI/2;
         let pos_x = Math.cos(circlepoint);
@@ -50,11 +50,16 @@ var GoalDetection = function(el){
     },
     this.updateGoalScan = function(obj){
         let dets = obj.dets
+        let center = obj.center
         let det_len = dets.length;
         this.build();
         for(var i = 0; i< det_len; i++){
-            this.addDet(dets[i][0]);
+            this.addDet(dets[i][0], 1, "rgba(100, 100, 255, 1)");
         }
+        if(obj.found)
+            this.addDet(center, 3, "rgba(200, 255, 200, 1)");
+        else
+            this.addDet(center, 2, "rgba(255, 200, 200, 1)");
     }
 };
 
