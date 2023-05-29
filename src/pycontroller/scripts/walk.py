@@ -504,7 +504,7 @@ def main():
 
         if ball_tracking.isEnabled:
             ball_tracking.track(track_ball)
-            #sendHeadControl(ball_tracking.pitch, ball_tracking.yaw)
+            # sendHeadControl(ball_tracking.pitch, ball_tracking.yaw)
         
         # val+=dir
         # if(val >= 0.9):
