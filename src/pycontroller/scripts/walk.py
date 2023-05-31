@@ -494,9 +494,11 @@ def main():
             if(goaltracker.state == goaltracker.SCAN_DONE):
                 statusDict = {
                     'dets': goaltracker.unclustered_goals,
-                    'center': dets.theta,
-                    'found': dets.found
+                    'found': goaltracker.goal.found
                 } 
+
+                if goaltracker.goal.found:
+                    statusDict['center']: goaltracker.goal.theta
 
                 send_message(-1, 'goal_scan_update', statusDict)
 

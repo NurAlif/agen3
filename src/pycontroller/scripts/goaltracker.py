@@ -126,19 +126,19 @@ def track(unclustered_goals):
     left_count = 0
     right_count = 0
 
-    for goal in np_goals.tolist():
-        if goal[0] > mid:
-            left.append(goal[1])
+    for goal_i in np_goals.tolist():
+        if goal_i[0] > mid:
+            left.append(goal_i[1])
             left_count += 1
         else:
-            right.append(goal[1])
+            right.append(goal_i[1])
             right_count += 1
 
 
     if len(right)>0 and len(left)>0:
         mean_left = np.mean(np.array(left), axis=0)
         mean_right = np.mean(np.array(right), axis=0)
-
+ 
         delta = mean_left-mean_right
 
         goal.setall(delta/2 + mean_left, delta[1], delta[0], True)
