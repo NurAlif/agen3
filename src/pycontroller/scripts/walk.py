@@ -154,6 +154,8 @@ async def ws_handler(websocket, path):
             elif cmd == "disable_ball_track":
                 walking.isEnabled = False
                 send_message(-1, "controller_msg", "Ball tracking disabled")
+            elif cmd == 'start_goal_track':
+                handleGoalTrack()
 
     finally:
         del connected_clients[client_id]
@@ -270,6 +272,10 @@ def headControlHandle(data):
         ball_tracking.isEnabled = True
     elif(data["enabled"] == False):
         ball_tracking.isEnabled = False
+
+def handleGoalTrack():
+    global goal_scanning
+    goal_scanning = True
 
 def reloadBallTrackerHandle():
     ball_tracking.x_p = read_ball_track_conf("PID", "x_p")
@@ -431,6 +437,7 @@ def handleStatusMsg(statusMsg):
 
 def main():
     global server
+    global goal_scanning
 
     rospy.init_node('main', anonymous=True)
 
@@ -471,7 +478,6 @@ def main():
 
     last_goal_scan = 0.0
     goal_scan_interval = 5.0 
-    scaning = True
 
     while not rospy.is_shutdown():
         toc = time.time()
@@ -484,24 +490,24 @@ def main():
         inference.detect(track_ball, dets)
 
         if(toc - last_goal_scan >= goal_scan_interval):
-            # scaning = not scaning
+            # goal_scanning = not goal_scanning
             last_goal_scan = toc
 
-        if(scaning):
+        if(goal_scanning):
 
             goaltracker.scan(dets)
 
             if(goaltracker.state == goaltracker.SCAN_DONE):
+                goal_scanning = False
                 statusDict = {
                     'dets': goaltracker.unclustered_goals,
                     'center': dets.theta,
                     'found': dets.found
-                } 
+                }
 
                 send_message(-1, 'goal_scan_update', statusDict)
 
         sendHeadControl(goaltracker.scan_tilt, goaltracker.current_pos)
-
 
         # print((track_ball.x, track_ball.y))
 

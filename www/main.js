@@ -33,9 +33,22 @@ var pidMonGraph =new GraphMonitor(document.getElementById("pid_mon_graph"));
 pidMonGraph.build();
 var goal_detection =new GoalDetection(document.getElementById("goal_detection"));
 goal_detection.build();
+var field = new Field(document.getElementById("field"))
+field.build();
+
 // goal_detection.addDet(1);
 // goal_detection.addDet(-1);
 // goal_detection.addDet(0);
+
+document.addEventListener("keydown", (event) => {
+    if (event.isComposing || event.key === 79) {
+        onStartGoalTrack();
+    }
+});
+
+document.addEventListener("keyup", event => {
+    
+});
 
 var pc = null;
 
@@ -420,6 +433,11 @@ function onSubmitHead(id){
     return false;
 }
 
+function onStartGoalTrack(i){
+    sendCmd("start_goal_track");
+    return false;
+}
+
 function onSubmitWalking(id){
     var el = document.getElementById(id);
     if(el == null) return false;
@@ -556,18 +574,7 @@ function getAll(){
 }
 
 
-document.addEventListener("keydown", event => {
-    if (event.isComposing || event.keyCode === 32) {
-        
-    }
-    if (event.isComposing || event.keyCode === 13) {
-        
-    }
-});
 
-document.addEventListener("keyup", event => {
-    
-});
 
 function sendCmd(cmd){
     var data = '{"cmd":"'+ cmd +'"}';

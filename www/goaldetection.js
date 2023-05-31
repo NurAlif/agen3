@@ -8,6 +8,9 @@ var GoalDetection = function(el){
     this.radius = 100,
     this.offset_x = 0,
     this.offset_y = 0,
+
+    this.found = false,
+    this.dets = undefined;
     
     this.build = function (){
 
@@ -56,10 +59,13 @@ var GoalDetection = function(el){
         for(var i = 0; i< det_len; i++){
             this.addDet(dets[i][0], 1, "rgba(100, 100, 255, 1)");
         }
-        if(obj.found)
+
+        if(obj.found){
             this.addDet(center, 3, "rgba(200, 255, 200, 1)");
-        else
-            this.addDet(center, 2, "rgba(255, 200, 200, 1)");
+            this.dets = obj;
+        }
+        
+        
     }
 };
 
