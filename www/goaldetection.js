@@ -58,10 +58,13 @@ var GoalDetection = function(el){
         this.build();
         for(var i = 0; i< det_len; i++){
             this.addDet(dets[i][0], 1, "rgba(100, 100, 255, 1)");
-        }
+        } 
 
-        if(obj.found){
-            this.addDet(center, 3, "rgba(200, 255, 200, 1)");
+        console.log(obj);
+        console.log(center);
+        if(obj.found === true){
+            console.log("found!");
+            this.addDet(center[0], 3, "rgba(200, 255, 200, 1)");
             this.dets = obj;
         }
         

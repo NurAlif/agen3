@@ -33,7 +33,8 @@ var pidMonGraph =new GraphMonitor(document.getElementById("pid_mon_graph"));
 pidMonGraph.build();
 var goal_detection =new GoalDetection(document.getElementById("goal_detection"));
 goal_detection.build();
-var field = new Field(document.getElementById("field"))
+var field_element = document.getElementById("field");
+var field = new Field(field_element);
 field.build();
 
 // goal_detection.addDet(1);
@@ -41,8 +42,17 @@ field.build();
 // goal_detection.addDet(0);
 
 document.addEventListener("keydown", (event) => {
-    if (event.isComposing || event.key === 79) {
+    console.log("masuk")
+    if (event.isComposing || event.keyCode === 79) {
+        console.log("masuk2")
         onStartGoalTrack();
+    }
+});
+
+document.addEventListener("keydown", (event) => {
+    console.log("masuk18")
+    if (event.isComposing || event.keyCode === 18) {
+        onSaveGoalTrack();
     }
 });
 
@@ -433,8 +443,13 @@ function onSubmitHead(id){
     return false;
 }
 
-function onStartGoalTrack(i){
+function onStartGoalTrack(){
     sendCmd("start_goal_track");
+    return false;
+}
+
+function onSaveGoalTrack(){
+    sendParameterized("save_goal_track","["+field.start.x.toString()+","+field.start.y.toString()+","+field.end.y.toString()+","+field.end.y.toString()+"]");
     return false;
 }
 

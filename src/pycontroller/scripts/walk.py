@@ -18,6 +18,7 @@ import ball_tracking
 import chaser
 import goaltracker
 import proto_localization as localize
+import recorder_client2 as recorder
 
 from configloader import read_walk_balance_conf, read_ball_track_conf, read_walking_conf
 
@@ -57,6 +58,8 @@ walking = Walking()
 track_ball = inference.Tracking()
 
 dets = inference.Detection()
+
+goal_scanning = False
 
 goaltracker.frame_size = (inference.streamer.frame_width, inference.streamer.frame_height)
 
@@ -156,6 +159,8 @@ async def ws_handler(websocket, path):
                 send_message(-1, "controller_msg", "Ball tracking disabled")
             elif cmd == 'start_goal_track':
                 handleGoalTrack()
+            elif cmd == 'save_goal_track':
+                saveGoalTrack(data['params'])
 
     finally:
         del connected_clients[client_id]
@@ -276,6 +281,21 @@ def headControlHandle(data):
 def handleGoalTrack():
     global goal_scanning
     goal_scanning = True
+
+def saveGoalTrack(param):
+    print(param)
+    goal = goaltracker.goal
+
+    unclustered = json.dumps(goaltracker.unclustered_goals)
+    theta = json.dumps(goal.theta.tolist())
+    print(unclustered)
+    grad = str(goal.grad)
+    span = str(goal.span)
+    print(theta)
+    print(grad)
+    print(span)
+
+    recorder.append(str(param)+","+theta+','+grad+','+span+','+unclustered)
 
 def reloadBallTrackerHandle():
     ball_tracking.x_p = read_ball_track_conf("PID", "x_p")
@@ -494,18 +514,23 @@ def main():
             last_goal_scan = toc
 
         if(goal_scanning):
+            try:
 
-            goaltracker.scan(dets)
+                goaltracker.scan(dets)
 
-            if(goaltracker.state == goaltracker.SCAN_DONE):
-                goal_scanning = False
-                statusDict = {
-                    'dets': goaltracker.unclustered_goals,
-                    'center': dets.theta,
-                    'found': dets.found
-                }
+                if(goaltracker.state == goaltracker.SCAN_DONE):
+                    goal_scanning = False
+                    statusDict = {
+                        'dets': goaltracker.unclustered_goals,
+                        'center': goaltracker.goal.theta.tolist(),
+                        'found': goaltracker.goal.found
+                    }
 
-                send_message(-1, 'goal_scan_update', statusDict)
+                    send_message(-1, 'goal_scan_update', statusDict)
+            except Exception as e:
+                shutdown()
+                print(sys.exc_info())
+                print(e)
 
         sendHeadControl(goaltracker.scan_tilt, goaltracker.current_pos)
 

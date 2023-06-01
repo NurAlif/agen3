@@ -87,7 +87,7 @@ def scan(dets):
             if scan_pos >= scan_subdivision:
                 state = SCAN_DONE
             #insert
-                if(found > 0):
+                if(len(unclustered_goals) > 0):
                     track(unclustered_goals)
             scan_pos+=1
         # else: dets.goals = []
@@ -117,8 +117,9 @@ def track(unclustered_goals):
     np_goals = np.array(unclustered_goals)
     max_goal_x, max_goal_y = np_goals.max(axis=0)
     min_goal_x, min_goal_y = np_goals.min(axis=0)
-    delta = max_goal_x - min_goal_x
-    mid = delta/2 + min_goal_x
+    delta_x = max_goal_x - min_goal_x
+    mid = delta_x/2 + min_goal_x
+
     
     left = []
     right = []
@@ -126,14 +127,16 @@ def track(unclustered_goals):
     left_count = 0
     right_count = 0
 
-    for goal in np_goals.tolist():
-        if goal[0] > mid:
-            left.append(goal[1])
+    for goal_i in unclustered_goals:
+        if goal_i[0] > mid:
+            left.append(goal_i)
             left_count += 1
         else:
-            right.append(goal[1])
+            right.append(goal_i)
             right_count += 1
 
+    print(left)
+    print(right)
 
     if len(right)>0 and len(left)>0:
         mean_left = np.mean(np.array(left), axis=0)
@@ -141,6 +144,8 @@ def track(unclustered_goals):
 
         delta = mean_left-mean_right
 
-        goal.setall(delta/2 + mean_left, delta[1], delta[0], True)
+        goal.setall(delta/2 + mean_right, delta[1], delta[0], True)
+        print(goal.theta)
+        print("pass")
 
     else: goal.found = False
