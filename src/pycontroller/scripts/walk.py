@@ -180,7 +180,6 @@ def between_callback():
     loop.close()
 
 async def send_message2(websocket_con, message):
-    print('sending')
     await websocket_con.send(message)
 
 def send_message(id, cmd, params):
@@ -193,11 +192,9 @@ def send_message(id, cmd, params):
     
     respJson = json.dumps(resp)
     if(id >= 0):
-        print('sendings')
         asyncio.run_coroutine_threadsafe(send_message2(connected_clients[id], respJson), server_loop)
     else:
         for client in connected_clients.values():
-            print('sendings')
             asyncio.run_coroutine_threadsafe(send_message2(client, respJson), server_loop)
 
 
@@ -283,19 +280,13 @@ def handleGoalTrack():
     goal_scanning = True
 
 def saveGoalTrack(param):
-    print(param)
     goal = goaltracker.goal
-
-    unclustered = json.dumps(goaltracker.unclustered_goals)
     theta = json.dumps(goal.theta.tolist())
-    print(unclustered)
     grad = str(goal.grad)
     span = str(goal.span)
-    print(theta)
-    print(grad)
-    print(span)
 
-    recorder.append(str(param)+","+theta+','+grad+','+span+','+unclustered)
+    recorder.append(str(param)+","+theta+','+grad+','+span,goaltracker.unclustered_goals)
+
 
 def reloadBallTrackerHandle():
     ball_tracking.x_p = read_ball_track_conf("PID", "x_p")

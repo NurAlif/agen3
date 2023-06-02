@@ -79,7 +79,7 @@ def scan(dets):
             
             found = len(in_goals)
             print("goals : "+str(found)+" "+str(current_pos))
-            if(found > 0):
+            if(found > 0 and scan_pos != 0):
                 for goal in in_goals:
                     goalPosInFrame = (goal[0]/frame_size[0]*fov-(fov/2))*-1
                     goal = (current_pos+goalPosInFrame+offset_x, goal[1]/frame_size[1])

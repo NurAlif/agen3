@@ -42,23 +42,16 @@ field.build();
 // goal_detection.addDet(0);
 
 document.addEventListener("keydown", (event) => {
-    console.log("masuk")
     if (event.isComposing || event.keyCode === 79) {
         console.log("masuk2")
         onStartGoalTrack();
     }
-});
-
-document.addEventListener("keydown", (event) => {
-    console.log("masuk18")
-    if (event.isComposing || event.keyCode === 18) {
+    else if (event.isComposing || event.keyCode === 81) {
+        console.log("masuk18")
         onSaveGoalTrack();
     }
 });
 
-document.addEventListener("keyup", event => {
-    
-});
 
 var pc = null;
 
@@ -93,8 +86,7 @@ var modal = {
         this.inputYes.setAttribute("onclick", callback);
         $('#'+this.container.id).modal("show");
     },
-    close : function(){
-        
+    close : function(){ 
     }
 }
 
