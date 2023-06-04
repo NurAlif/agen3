@@ -46,17 +46,25 @@ head_target_y = 0.0
 
 unclustered_goals = []
 
+enabled = False
+
 class Goal:
     def __init__(self):
         self.theta = 0.0  #which angle goal detected
         self.grad = 0.0  #left-right gradient
         self.span = 1.0  #left-right span 
         self.found = False
+        self.left = None
+        self.right = None
     def setall(self, _theta, _grad, _span, _found):
         self.theta = _theta
         self.grad = _grad
         self.span = _span
         self.found = _found
+    def setall2(self, _left, _right, _found):
+        self.found = _found
+        self.left = _left
+        self.right = _right
 
 goal = Goal()
 
@@ -142,10 +150,14 @@ def track(unclustered_goals):
         mean_left = np.mean(np.array(left), axis=0)
         mean_right = np.mean(np.array(right), axis=0)
 
-        delta = mean_left-mean_right
+        print("means:")
+        print(mean_left)
+        print(mean_right)
 
-        goal.setall(delta/2 + mean_right, delta[1], delta[0], True)
-        print(goal.theta)
-        print("pass")
+        center = (mean_left-mean_right)/2+mean_right
+
+        # goal.setall2(mean_right.item(1), mean_left.item(1), True)
+        goal.theta = center
+        goal.found = True
 
     else: goal.found = False

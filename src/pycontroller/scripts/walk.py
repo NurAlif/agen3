@@ -17,8 +17,9 @@ import inference2 as inference
 import ball_tracking
 import chaser
 import goaltracker
-import proto_localization as localize
+import localization as lz
 import recorder_client2 as recorder
+import striker
 
 from configloader import read_walk_balance_conf, read_ball_track_conf, read_walking_conf
 
@@ -59,8 +60,6 @@ track_ball = inference.Tracking()
 
 dets = inference.Detection()
 
-goal_scanning = False
-
 goaltracker.frame_size = (inference.streamer.frame_width, inference.streamer.frame_height)
 
 clients = {}
@@ -73,6 +72,8 @@ isManagerReady = False
 connected_clients = {}
 
 server_loop = None
+
+head_control = [0,0] # pitch,yaw
 
 async def ws_handler(websocket, path):
     client_id = id(websocket)
@@ -201,12 +202,12 @@ def send_message(id, cmd, params):
 
 
 
-def sendHeadControl(pitch, yaw):
+def sendHeadControl():
     js = JointState()
     js.name.append("head_tilt")
     js.name.append("head_pan")
-    js.position.append(pitch)
-    js.position.append(yaw)
+    js.position.append(head_control[0])
+    js.position.append(head_control[1])
     pubHeadControl.publish(js)
 
 def sendWithWalkParams():
@@ -267,7 +268,7 @@ def startRobot():
 def headControlDirect(data):
     pitch = data["pitch"]
     yaw = data["yaw"]
-    sendHeadControl(pitch, yaw)
+    sendHeadControl((pitch, yaw))
 
 def headControlHandle(data):
     if(data["enabled"] == True):
@@ -276,8 +277,7 @@ def headControlHandle(data):
         ball_tracking.isEnabled = False
 
 def handleGoalTrack():
-    global goal_scanning
-    goal_scanning = True
+    goaltracker.enabled = True
 
 def saveGoalTrack(param):
     goal = goaltracker.goal
@@ -448,7 +448,7 @@ def handleStatusMsg(statusMsg):
 
 def main():
     global server
-    global goal_scanning
+    global head_control
 
     rospy.init_node('main', anonymous=True)
 
@@ -501,21 +501,26 @@ def main():
         inference.detect(track_ball, dets)
 
         if(toc - last_goal_scan >= goal_scan_interval):
-            # goal_scanning = not goal_scanning
+            # goaltracker.enabled = not goaltracker.enabled
             last_goal_scan = toc
 
-        if(goal_scanning):
+        if(goaltracker.enabled):
             try:
 
                 goaltracker.scan(dets)
 
                 if(goaltracker.state == goaltracker.SCAN_DONE):
-                    goal_scanning = False
+                    goaltracker.enabled = False
                     statusDict = {
                         'dets': goaltracker.unclustered_goals,
                         'center': goaltracker.goal.theta.tolist(),
                         'found': goaltracker.goal.found
                     }
+
+                    # lz.locallize_from_dist(goaltracker.goal.left, goaltracker.goal.right)
+                    # print("Pos:")
+                    # print(lz.pos_x)
+                    # print(lz.pos_y)
 
                     send_message(-1, 'goal_scan_update', statusDict)
             except Exception as e:
@@ -523,19 +528,23 @@ def main():
                 print(sys.exc_info())
                 print(e)
 
-        sendHeadControl(goaltracker.scan_tilt, goaltracker.current_pos)
+            sendHeadControl(goaltracker.scan_tilt, goaltracker.current_pos)
 
         # print((track_ball.x, track_ball.y))
 
-        if ball_tracking.isEnabled:
-            ball_tracking.track(track_ball)
-            # sendHeadControl(ball_tracking.pitch, ball_tracking.yaw)
+        elif ball_tracking.isEnabled:
+            if inference.ball_lock:
+                ball_tracking.track(track_ball)
+            else:
+                ball_tracking.search(toc)
+            sendHeadControl(ball_tracking.pitch, ball_tracking.yaw)
         
         # val+=dir
         # if(val >= 0.9):
         #     dir = -0.1
         # if(val <= -0.9):
         #     dir = 0.1
+
 
     
             

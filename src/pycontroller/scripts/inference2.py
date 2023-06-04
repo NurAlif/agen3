@@ -169,7 +169,7 @@ def detect(track_ball, dets):
             cv2.rectangle(img,tuple(box[:2]),tuple(box[2:]),color_goal,2)
             x = int((box[0] + box[2]) / 2)
             y = int((box[1] + box[3]) / 2)
-            detected_goals.append([x,y])
+            detected_goals.append([x, max(box[3], box[1])])
         else:
             x = int((box[0] + box[2]) / 2)
             y = int((box[1] + box[3]) / 2)

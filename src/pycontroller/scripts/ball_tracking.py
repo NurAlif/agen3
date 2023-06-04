@@ -25,7 +25,7 @@ out_scale_x = 4
 out_scale_y = 4
 
 max_pitch = 1
-min_pitch = -0.5
+min_pitch = -0.15
 max_yaw = 1.5
 min_yaw = -1.5
 
@@ -42,8 +42,8 @@ isEnabled = True
 ####
 search_state = 0
 s_max_angle = 0.8
-s_speed = 0.03
-s_2_count = 0
+turn_speed_delay = 0.53
+last_search_turn = 0
 
 def reload():
     pid_x.tunings = (x_p,x_i,x_d)
@@ -60,6 +60,7 @@ def track(error):
     global pitch
     global s_2_count
     global search_state
+    search_state = 0
 
     # ex = error.x
     # if(ex > 0.1 or ex < -0.1):
@@ -91,18 +92,29 @@ def track(error):
     pitch = max(min(pitch, max_pitch), min_pitch)
     yaw = max(min(yaw, max_yaw), min_yaw)
 
-def search():
+def search(time):
     global search_state
     global yaw
-    global s_max_angle
-    global s_speed
-    if(search_state == 0):
-        if(yaw < s_max_angle):
-            yaw += s_speed
-        else:
-            search_state = 1
+    global pitch
+    global last_search_turn
+
     if(search_state == 1):
-        if(yaw > -s_max_angle):
-            yaw -= s_speed
-        else:
-            search_state = 0
+        if time - last_search_turn >= turn_speed_delay:
+            yaw = max_yaw
+            last_search_turn = time
+            pitch += 0.25
+            search_state = 2
+            if pitch >= max_pitch+0.1: search_state = 0
+
+    elif(search_state == 2):
+        if time - last_search_turn >= turn_speed_delay:
+            yaw = min_yaw
+            last_search_turn = time
+            pitch += 0.25
+            search_state = 1
+            if pitch >= max_pitch+0.1: search_state = 0
+        
+    elif search_state == 0:
+        yaw = min_yaw+0.3
+        pitch = min_pitch
+        search_state = 1
