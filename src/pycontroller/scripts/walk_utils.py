@@ -3,7 +3,7 @@ joints = [
     "head_tilt",
     "l_ank_pitch",
     "l_ank_roll",
-    # "l_el",
+    "l_el",
     "l_hip_pitch",
     "l_hip_roll",
     "l_hip_yaw",
@@ -12,7 +12,7 @@ joints = [
     "l_sho_roll",
     "r_ank_pitch",
     "r_ank_roll",
-    # "r_el",
+    "r_el",
     "r_hip_pitch",
     "r_hip_roll",
     "r_hip_yaw",
@@ -25,7 +25,7 @@ def setWalkParamsConvert(walkParams, param):
 
     paramName = param[0]
     paramValue = param[1]
-    print("asdasd")
+    print("params changing:")
     print(param[0])
     print(param[1])
 

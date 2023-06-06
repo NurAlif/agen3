@@ -12,6 +12,6 @@
     <node pkg="op3_manager" type="op3_manager" name="op3_manager" output="screen">
 	    <param name="angle_unit" value="30" />
 	</node>
-    
+    <node pkg="gamecontrol" type="main.py" name="gamestatelistener"/>
     <node pkg="pycontroller" type="walk.py" name="controllerpy" output="screen"/>
 </launch>

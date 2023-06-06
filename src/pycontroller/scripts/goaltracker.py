@@ -9,6 +9,7 @@ SCANING_HOLD_PAN = 3
 SCANING_POST_HOLD = 6
 SCANING_PANING = 4
 SCAN_DONE = 5
+SCAN_DONE_POST = 8
 
 state = SEARCHING
 
@@ -30,11 +31,15 @@ min_scan = -1.5 # -90 deg
 max_scan = 1.5
 scan_pos = -1
 
+scan_step = (max_scan - min_scan)/scan_subdivision
+
 #searching param
-interval_pan = 0.4 #sec
-hold_pan = 0.2 #sec
-pad_pan = 0.1 #sec
+interval_pan = 0.1 #sec
+hold_pan = 0.1 #sec
+pad_pan = 0.05 #sec
 lastTic = 0
+
+post_done_time = 1
 
 current_pos = 0
 
@@ -45,6 +50,8 @@ head_target_y = 0.0
 
 
 unclustered_goals = []
+
+pre_head_pos = [0.0,0.0]
 
 enabled = False
 
@@ -82,8 +89,6 @@ def scan(dets):
         if(delta_t > hold_pan):
             lastTic = toc
             state = SCANING_POST_HOLD
-            scan_step = (max_scan - min_scan)/scan_subdivision
-            current_pos = (scan_step*scan_pos+min_scan)
             
             found = len(in_goals)
             print("goals : "+str(found)+" "+str(current_pos))
@@ -93,7 +98,8 @@ def scan(dets):
                     goal = (current_pos+goalPosInFrame+offset_x, goal[1]/frame_size[1])
                     unclustered_goals.append(goal) 
             if scan_pos >= scan_subdivision:
-                state = SCAN_DONE
+                state = SCAN_DONE_POST
+                lastTic = toc
             #insert
                 if(len(unclustered_goals) > 0):
                     track(unclustered_goals)
@@ -108,15 +114,18 @@ def scan(dets):
             lastTic = toc
             dets.goals = []
             state = SCANING_HOLD_PAN
+            current_pos = (scan_step*scan_pos+min_scan)
     elif(state == SCANING_POST_HOLD):
         if(delta_t > pad_pan):
             lastTic = toc
             state = SCANING_PANING
-            
+    elif(state == SCAN_DONE_POST):
+        if(delta_t > post_done_time):
+            state = SCAN_DONE
+            scan_pos = 0
     else:
         state = SCANING_PRE_HOLD
         unclustered_goals = []
-        scan_pos = 0
         
 
 

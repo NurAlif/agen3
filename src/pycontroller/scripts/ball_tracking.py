@@ -58,34 +58,12 @@ def track(error):
     global yaw
     global pid_y
     global pitch
-    global s_2_count
     global search_state
     search_state = 0
-
-    # ex = error.x
-    # if(ex > 0.1 or ex < -0.1):
-    #     ex -= 0.11
-
-    # out_x = (ex) * out_scale
-    # out_y = pid_y(error.y) * out_scale
-    # out_y = 0.0
-
-    # # print(out_x)
-
-    # pitch += out_y
-    # yaw += max(min(-out_x, 0.1), -0.1)
-
 
     out_x = pid_x(error.x)*out_scale_x*flip_x
     out_y = pid_y(error.y)*out_scale_y*flip_y
 
-    # if(search_state == 2):
-    #     s_2_count += 1
-    #     pitch = out_y * 0.1
-    #     yaw = out_x * 0.1
-    #     if(s_2_count == 13):
-    #         search_state = 0
-    # else:
     pitch += out_y * 0.1
     yaw += out_x * 0.1
 

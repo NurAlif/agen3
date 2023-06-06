@@ -100,7 +100,7 @@ res = None
 lost_count = 0
 ball_lock = False
 
-max_lost = 120
+max_lost = 30
 goto_zero_x = 0.01
 goto_zero_y = 0.01
 stop_zone = 0.20

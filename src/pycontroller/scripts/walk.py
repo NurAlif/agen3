@@ -74,6 +74,7 @@ connected_clients = {}
 server_loop = None
 
 head_control = [0,0] # pitch,yaw
+movement = [0,0] # move, yaw
 
 async def ws_handler(websocket, path):
     client_id = id(websocket)
@@ -211,7 +212,7 @@ def sendHeadControl():
     pubHeadControl.publish(js)
 
 def sendWithWalkParams():
-    if walking.control == None and not chaser.enabled: return
+    if walking.control == None and not striker.enabled: return
 
     global walkParams
     global pubSetParams
@@ -224,7 +225,7 @@ def sendWithWalkParams():
         walkParams.y_move_amplitude = 0.0
     
     pubSetParams.publish(walkParams)
-    print("params set")
+    # print("params set")
     send_message(-1, "update_walking", walking.getWalkingCurrent())
 
 def enableWalk():
@@ -266,9 +267,9 @@ def startRobot():
     pubBT.publish("user_long")
 
 def headControlDirect(data):
-    pitch = data["pitch"]
-    yaw = data["yaw"]
-    sendHeadControl((pitch, yaw))
+    global head_control
+    head_control[0] = data["pitch"]
+    head_control[1] = data["yaw"]
 
 def headControlHandle(data):
     if(data["enabled"] == True):
@@ -445,6 +446,13 @@ def handleStatusMsg(statusMsg):
 
     send_message(-1, 'update_status', statusDict)
 
+def gamestate_callback(data):
+    if(data.data == "play"):
+        setWalkCmd("start")
+        send_message(-1, "walk_control", True)
+    else:
+        setWalkCmd("stop")
+        send_message(-1, "walk_control", True)
 
 def main():
     global server
@@ -458,6 +466,7 @@ def main():
 
     # rospy.Subscriber("/robotis/open_cr/imu", Imu, handleImu)
     rospy.Subscriber("/robotis/status", StatusMsg, handleStatusMsg)
+    rospy.Subscriber("gamestate", String, gamestate_callback)
     # rospy.Subscriber("balance_monitor", String, handleBalanceMonitor)
     
     rospy.loginfo("Waiting manager...")
@@ -490,23 +499,22 @@ def main():
     last_goal_scan = 0.0
     goal_scan_interval = 5.0 
 
+    striker.init(goaltracker, inference, ball_tracking, walking, setWalkParams)
+
     while not rospy.is_shutdown():
-        toc = time.time()
-        delta_t = toc - lastSendParamTic
-        if(delta_t > SEND_PARAM_INTERVAL):
-            lastSendParamTic = toc
-            walking.stepToTargetVel()
-            sendWithWalkParams()
+        # try:
+            toc = time.time()
+            delta_t = toc - lastSendParamTic
 
-        inference.detect(track_ball, dets)
+            inference.detect(track_ball, dets)
 
-        if(toc - last_goal_scan >= goal_scan_interval):
-            # goaltracker.enabled = not goaltracker.enabled
-            last_goal_scan = toc
+            if(toc - last_goal_scan >= goal_scan_interval):
+                # goaltracker.enabled = not goaltracker.enabled
+                last_goal_scan = toc
 
-        if(goaltracker.enabled):
-            try:
+            striker.run(toc, dets, track_ball, head_control)
 
+            if(goaltracker.enabled):
                 goaltracker.scan(dets)
 
                 if(goaltracker.state == goaltracker.SCAN_DONE):
@@ -516,34 +524,34 @@ def main():
                         'center': goaltracker.goal.theta.tolist(),
                         'found': goaltracker.goal.found
                     }
-
-                    # lz.locallize_from_dist(goaltracker.goal.left, goaltracker.goal.right)
-                    # print("Pos:")
-                    # print(lz.pos_x)
-                    # print(lz.pos_y)
-
                     send_message(-1, 'goal_scan_update', statusDict)
-            except Exception as e:
-                shutdown()
-                print(sys.exc_info())
-                print(e)
+                elif goaltracker.state == goaltracker.SCAN_DONE_POST:
+                    head_control[0] = goaltracker.pre_head_pos[0]
+                    head_control[1] = goaltracker.pre_head_pos[1]
+                else:
+                    head_control[0] = goaltracker.scan_tilt 
+                    head_control[1] = goaltracker.current_pos
 
-            sendHeadControl(goaltracker.scan_tilt, goaltracker.current_pos)
+            elif ball_tracking.isEnabled:
+                if inference.ball_lock:
+                    ball_tracking.track(track_ball)
+                else:
+                    ball_tracking.search(toc)
 
-        # print((track_ball.x, track_ball.y))
+                head_control[0] = ball_tracking.pitch
+                head_control[1] = ball_tracking.yaw
 
-        elif ball_tracking.isEnabled:
-            if inference.ball_lock:
-                ball_tracking.track(track_ball)
-            else:
-                ball_tracking.search(toc)
-            sendHeadControl(ball_tracking.pitch, ball_tracking.yaw)
-        
-        # val+=dir
-        # if(val >= 0.9):
-        #     dir = -0.1
-        # if(val <= -0.9):
-        #     dir = 0.1
+            sendHeadControl()
+
+            if(delta_t > SEND_PARAM_INTERVAL):
+                lastSendParamTic = toc
+                walking.stepToTargetVel()
+                sendWithWalkParams()
+            
+        # except Exception as e:
+        #     shutdown()
+        #     print(sys.exc_info())
+        #     print(e)
 
 
     
