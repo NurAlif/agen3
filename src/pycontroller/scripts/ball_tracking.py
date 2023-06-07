@@ -1,6 +1,7 @@
 import math
 from simple_pid import PID
 
+
 x_p = 0.3
 y_p = 0.23
 x_i = 0.001
@@ -45,6 +46,8 @@ s_max_angle = 0.8
 turn_speed_delay = 0.53
 last_search_turn = 0
 
+searching = False
+
 def reload():
     pid_x.tunings = (x_p,x_i,x_d)
     pid_y.tunings = (y_p,y_i,y_d)
@@ -67,8 +70,34 @@ def track(error):
     pitch += out_y * 0.1
     yaw += out_x * 0.1
 
-    pitch = max(min(pitch, max_pitch), min_pitch)
-    yaw = max(min(yaw, max_yaw), min_yaw)
+    set_py(pitch, yaw)
+
+def set_py(_pitch, _yaw):
+    global pitch
+    global yaw
+
+    pitch = max(min(_pitch, max_pitch), min_pitch)
+    yaw = max(min(_yaw, max_yaw), min_yaw)
+
+scan_bufer = []
+last_scan_epoch = 0.1
+
+def set_py_from_buff():
+    span_yaw = max_yaw - min_yaw
+
+    size_buff = len(scan_bufer)
+    buf_item = scan_bufer[0]
+    if(size_buff > 5):
+        buf_item = scan_bufer[-5]
+
+    back_yaw = 0
+    if(buf_item[2] == 1):
+        back_yaw = (buf_item[1]/turn_speed_delay*span_yaw) + min_yaw
+    else:
+        back_yaw = (buf_item[1]/turn_speed_delay*-span_yaw) + max_yaw
+
+    set_py(buf_item[0], back_yaw)
+
 
 def search(time):
     global search_state
@@ -76,8 +105,10 @@ def search(time):
     global pitch
     global last_search_turn
 
+    delta_last_search = time - last_search_turn
     if(search_state == 1):
-        if time - last_search_turn >= turn_speed_delay:
+        scan_bufer.append((pitch, delta_last_search, search_state))
+        if delta_last_search >= turn_speed_delay:
             yaw = max_yaw
             last_search_turn = time
             pitch += 0.25
@@ -85,6 +116,7 @@ def search(time):
             if pitch >= max_pitch+0.1: search_state = 0
 
     elif(search_state == 2):
+        scan_bufer.append((pitch, delta_last_search, search_state))
         if time - last_search_turn >= turn_speed_delay:
             yaw = min_yaw
             last_search_turn = time

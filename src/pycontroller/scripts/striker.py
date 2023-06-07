@@ -11,6 +11,7 @@ BALL_APPROACH = 1
 SHOOTING = 4
 GOAL_ALIGN = 2
 GOAL_ALIGN_2 = 3
+GOAL_ALIGN_POST = 5
 
 state = 0
 
@@ -56,9 +57,9 @@ def run(time, dets, track_ball, head_control):
     if state == BALL_SEARCHING:
         if bt.isEnabled and not gt.enabled and infer.ball_lock:
             move = 0.1
-            if head_control[0] > -0.25: 
+            if head_control[0] > -0.22: 
                 move = 0.8
-            elif head_control[0] < -0.25:
+            elif head_control[0] < -0.22 and abs(head_control[1]) < 0.1 :
                 state = GOAL_ALIGN
                 gt.enabled = True
                 gt.pre_head_pos[0] = head_control[0]
@@ -80,19 +81,28 @@ def run(time, dets, track_ball, head_control):
     elif state == GOAL_ALIGN:
         goal = gt.goal
         if not gt.enabled and goal.found:
-            goal_align_time = abs(goal.theta.item(0)) * 5
+            goal_align_time = abs(goal.theta.item(0)) * 10
             start_align_turn = time
-            turn_gain = goal.theta.item(0)
-            x_gain = max(min(-turn_gain*1.1, 1), -1)
-            yaw_gain = max(min(turn_gain, 0.6), -0.6)
-            walk.setTarget(Vector2yaw(x_gain , 0.0, yaw_gain))
+            turn_gain = -1.5
+            if(goal.theta.item(0) > 0.0): turn_gain = 1.5
+            x_gain = turn_gain
+            yaw_gain = max(min(turn_gain, 0.25), -0.25)
+            walk.setTarget(Vector2yaw(-x_gain , 0.0, yaw_gain))
             state = GOAL_ALIGN_2
-            setwalkparams(["init_yaw_offset", -0.05])
-            setwalkparams(["init_y_offset", 0.08])
+            setwalkparams(["z_move_amplitude", 0.03])
+            print("X_GAIN: ", str(-x_gain))
     elif state == GOAL_ALIGN_2:
         goal = gt.goal
         if time - start_align_turn > goal_align_time:
             walk.setTarget(Vector2yaw(0.0, 0.6, 0.0))
-            setwalkparams(["init_yaw_offset", 0.3])
-            setwalkparams(["init_y_offset", 0.036])
-    # elif state == SHOOTING:
+            setwalkparams(["z_move_amplitude", 0.02])
+            state = GOAL_ALIGN_POST
+
+            gt.enabled = True
+            gt.pre_head_pos[0] = head_control[0]
+            gt.pre_head_pos[1] = head_control[1]
+            # setwalkparams(["init_yaw_offset", 0.3])
+            # setwalkparams(["init_y_offset", 0.036])
+    elif state == GOAL_ALIGN_POST:
+        print("finish")
+        # elif state == SHOOTING:

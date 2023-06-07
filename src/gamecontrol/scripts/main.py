@@ -40,13 +40,13 @@ def talker():
             if(data[1] == 71):
                 if(data[2] == 109):
                     if(data[3] == 101):
-                        print("received:")
-                        print(data[10])
-                        if(current_state != data[10]):
-                            current_state = data[10]
-                            state_str = game_states[current_state]
-                            rospy.loginfo(state_str)
-                            pub.publish(state_str)
+                        for i in range(10):
+                            if(data[3+i] == 6):
+                                current_state = data[4+i]
+                                state_str = game_states[current_state]
+                                rospy.loginfo(state_str)
+                                pub.publish(state_str)
+                                break
         rate.sleep()
 
     client.close()

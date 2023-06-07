@@ -217,12 +217,8 @@ def sendWithWalkParams():
     global walkParams
     global pubSetParams
     walkParams.x_move_amplitude = walking.vectorCurrent.y
-    if(walking.turn_mode == CONTROL_MODE_HEADLESS):
-        walkParams.y_move_amplitude = walking.vectorCurrent.x
-        walkParams.angle_move_amplitude = 0.0
-    else:
-        walkParams.angle_move_amplitude = walking.vectorCurrent.yaw
-        walkParams.y_move_amplitude = 0.0
+    walkParams.angle_move_amplitude = walking.vectorCurrent.yaw
+    walkParams.y_move_amplitude = walking.vectorCurrent.x
     
     pubSetParams.publish(walkParams)
     # print("params set")
@@ -490,6 +486,7 @@ def main():
         rospy.loginfo("Inference Start ERROR")
         raise SystemExit('ERROR: failed to start inference!')
     else:
+        setWalkParams(["balance_enable", 1])
         rospy.loginfo("Inference Started")
 
     global lastSendParamTic
@@ -534,8 +531,14 @@ def main():
 
             elif ball_tracking.isEnabled:
                 if inference.ball_lock:
+                    if(ball_tracking.searching):
+                        ball_tracking.searching = False
+                        ball_tracking.set_py_from_buff()
+                        
+
                     ball_tracking.track(track_ball)
                 else:
+                    ball_tracking.searching = True
                     ball_tracking.search(toc)
 
                 head_control[0] = ball_tracking.pitch

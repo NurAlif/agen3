@@ -553,11 +553,11 @@ function onWalkingControlModeChanged(controlMode){
 
 function onWalkingTurnModeChanged(controlMode){
     if(controlMode === TURN_MODE_YAW){
-        sendParameterized("set_walking_conf", ["turn_mode", 1]);
+        sendParameterized("set_walking_conf", JSON.stringify(["turn_mode", 1]));
         dropdownTurnMode.setActive(TURN_MODE_YAW)
         controlTurnMode = TURN_MODE_YAW;
     }else if(controlMode === TURN_MODE_HEADLESS){
-        sendParameterized("set_walking_conf", ["turn_mode", 0]);
+        sendParameterized("set_walking_conf", JSON.stringify(["turn_mode", 0]));
         dropdownTurnMode.setActive(TURN_MODE_HEADLESS)
         controlTurnMode = TURN_MODE_HEADLESS;
     }
