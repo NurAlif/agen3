@@ -64,6 +64,8 @@ class Vector2yaw:
 CONTROL_MODE_HEADLESS = 0
 CONTROL_MODE_YAWMODE = 1
 
+
+
 class Walking:
     def __init__(self):
         self.control = None # held controller socket id
@@ -75,6 +77,7 @@ class Walking:
         self.vectorMultiplier = Vector2yaw(0.02, 0.02, 0.2)
         self.vectorCurrent = Vector2yaw()
         self.vectorTarget = Vector2yaw() # normalized
+
 
     def setTarget(self, newTarget): # normalized input
         self.vectorTarget = Vector2yaw.add(Vector2yaw.multiply(newTarget, self.vectorMultiplier), self.stationary_offset)
@@ -129,7 +132,9 @@ class Walking:
         if(self.control == None):
             confDict['control'] = -1
         return confDict
+    
     def getWalkingCurrent(self):
         current = self.vectorCurrent
         array = [current.x, current.y, current.yaw]
         return array
+    

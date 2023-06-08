@@ -76,6 +76,8 @@ server_loop = None
 head_control = [0,0] # pitch,yaw
 movement = [0,0] # move, yaw
 
+is_walking = False
+
 async def ws_handler(websocket, path):
     client_id = id(websocket)
     connected_clients[client_id] = websocket
@@ -98,11 +100,9 @@ async def ws_handler(websocket, path):
                 setDxlTorque()
                 send_message(-1, "torque_control", False)
             elif cmd == 'start_walk':
-                setWalkCmd("start")
-                send_message(-1, "walk_control", True)
+                walk_toggle(True)
             elif cmd == 'stop_walk':
-                setWalkCmd("stop")
-                send_message(-1, "walk_control", False)
+                walk_toggle(False)
             elif cmd == 'save_walk_params':
                 setWalkCmd("save")
                 send_message(-1, "walk_params_saved", True)
@@ -212,8 +212,8 @@ def sendHeadControl():
     pubHeadControl.publish(js)
 
 def sendWithWalkParams():
-    if walking.control == None and not striker.enabled: return
-
+    if not striker.enabled: return
+    if is_walking == False: return
     global walkParams
     global pubSetParams
     walkParams.x_move_amplitude = walking.vectorCurrent.y
@@ -222,7 +222,7 @@ def sendWithWalkParams():
     
     pubSetParams.publish(walkParams)
     # print("params set")
-    send_message(-1, "update_walking", walking.getWalkingCurrent())
+    # send_message(-1, "update_walking", walking.getWalkingCurrent())
 
 def enableWalk():
     pubEnaMod.publish("walking_module")
@@ -333,7 +333,14 @@ def updateAngle():
     send_message(-1, 'angle_update', yaw)
 
 def setWalkCmd(walkCmd):
+    global is_walking
     # sendWalkCorrectionConf()
+    if walkCmd == "start": 
+        is_walking = True
+        send_message(-1, "walk_control", True)
+    elif walkCmd ==  "stop": 
+        is_walking = False
+        send_message(-1, "walk_control", False)
     if walkCmd == "start" or walkCmd == "stop" or walkCmd == "balance on" or walkCmd == "balance off" or walkCmd == "save":
         print("walk : ", walkCmd)
         pubWalkCmd.publish(walkCmd)
@@ -448,13 +455,18 @@ def handleStatusMsg(statusMsg):
 
     send_message(-1, 'update_status', statusDict)
 
+def walk_toggle(_on):
+    if not striker.initialized: return
+    if _on:
+        setWalkCmd("start") 
+        striker.set_state(striker.WALK_STARTING, time.time(), 2.0)
+    else: striker.set_state(striker.WALK_STOPING, time.time(), 1.0)
+
 def gamestate_callback(data):
     if(data.data == "play"):
-        setWalkCmd("start")
-        send_message(-1, "walk_control", True)
+        walk_toggle(True)
     else:
-        setWalkCmd("stop")
-        send_message(-1, "walk_control", True)
+        walk_toggle(False)
 
 def main():
     global server
@@ -502,7 +514,7 @@ def main():
     last_goal_scan = 0.0
     goal_scan_interval = 5.0 
 
-    striker.init(goaltracker, inference, ball_tracking, walking, setWalkParams)
+    striker.init(goaltracker, inference, ball_tracking, walking, setWalkParams, setWalkCmd)
 
     while not rospy.is_shutdown():
         # try:
@@ -555,8 +567,8 @@ def main():
             if(delta_t > SEND_PARAM_INTERVAL):
                 lastSendParamTic = toc
                 walking.stepToTargetVel()
-                striker.yaw += 0.01 * walking.vectorCurrent.yaw
-                updateAngle(striker.yaw)
+                striker.yaw += 0.05 * walking.vectorCurrent.yaw
+                updateAngle()
                 sendWithWalkParams()
             
         # except Exception as e:

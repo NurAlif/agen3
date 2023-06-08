@@ -87,6 +87,10 @@ def set_py_from_buff():
 
     size_buff = len(scan_bufer)
     buf_item = scan_bufer[0]
+
+    if(size_buff <= 0): 
+        set_py(0.3, 0)
+
     if(size_buff > 15):
         buf_item = scan_bufer[-15]
 
