@@ -67,8 +67,29 @@ var GoalDetection = function(el){
             this.addDet(center[0], 3, "rgba(200, 255, 200, 1)");
             this.dets = obj;
         }
+    },
+
+    this.set_angle = function(angle){
+        var ctx = this.canvas.getContext("2d");
+        ctx.beginPath();
+
+        ctx.strokeStyle = "rgba(200, 255, 200, 2)";
+        ctx.lineWidth = 3;
         
+        let circlepoint = angle
+        let pos_x = Math.cos(circlepoint) * this.radius/2;
+        let pos_y = -Math.sin(circlepoint) * this.radius/2;
         
+        let offsetx = this.width/2;
+        let offsety = this.height * 3/4;
+        
+        ctx.moveTo(offsetx, offsety);
+        ctx.lineTo(pos_x + offsetx, pos_y + offsety);
+        ctx.stroke();
+        
+        ctx.beginPath();
+        ctx.arc(offsetx, offsety, 8, 0, 2 * Math.PI);  
+        ctx.fill();
     }
 };
 

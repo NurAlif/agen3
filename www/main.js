@@ -33,6 +33,9 @@ var pidMonGraph =new GraphMonitor(document.getElementById("pid_mon_graph"));
 pidMonGraph.build();
 var goal_detection =new GoalDetection(document.getElementById("goal_detection"));
 goal_detection.build();
+
+goal_detection.set_angle(1);
+
 var field_element = document.getElementById("field");
 var field = new Field(field_element);
 field.build();
@@ -376,6 +379,11 @@ ws.onmessage = function (event){
     if(cmd == "update_status"){
         handleStatusMsg(obj.params);
     }
+
+    if(cmd == "angle_update"){
+        handle_angle_update(obj.params);
+    }
+
     if(cmd == "controller_msg"){
         alert.show(alert.TYPE_INFO, obj.params);
     }
@@ -484,6 +492,10 @@ function onSubmitWalking(id){
     sendParameterized("set_walking_conf", JSON.stringify([param, [axis, el.value]]));
     console.log(id + el.value);
     return false;
+}
+
+function handle_angle_update(angle){
+    goal_detection.set_angle(angle)
 }
 
 function onSubmitCB(id){

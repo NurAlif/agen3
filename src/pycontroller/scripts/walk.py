@@ -326,6 +326,12 @@ def streamOfferHandle(data, client):
 def headPIDHandle(data):
     ball_tracking.pid_x.tunings(data["p"], data["i"], data["d"])
 
+def updateAngle():
+    yaw = striker.yaw
+    if yaw != striker.last_yaw:
+        striker.last_yaw = yaw
+    send_message(-1, 'angle_update', yaw)
+
 def setWalkCmd(walkCmd):
     # sendWalkCorrectionConf()
     if walkCmd == "start" or walkCmd == "stop" or walkCmd == "balance on" or walkCmd == "balance off" or walkCmd == "save":
@@ -549,6 +555,8 @@ def main():
             if(delta_t > SEND_PARAM_INTERVAL):
                 lastSendParamTic = toc
                 walking.stepToTargetVel()
+                striker.yaw += 0.01 * walking.vectorCurrent.yaw
+                updateAngle(striker.yaw)
                 sendWithWalkParams()
             
         # except Exception as e:
