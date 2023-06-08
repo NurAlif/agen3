@@ -87,8 +87,8 @@ def set_py_from_buff():
 
     size_buff = len(scan_bufer)
     buf_item = scan_bufer[0]
-    if(size_buff > 5):
-        buf_item = scan_bufer[-5]
+    if(size_buff > 15):
+        buf_item = scan_bufer[-15]
 
     back_yaw = 0
     if(buf_item[2] == 1):
