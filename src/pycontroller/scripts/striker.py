@@ -9,19 +9,30 @@ from walking import Vector2yaw
 
 
 
+AUTO_READY = 9
+
 BALL_SEARCHING = 0
 BALL_APPROACH = 1
-SHOOTING = 4
 GOAL_ALIGN = 2
 GOAL_ALIGN_2 = 3
 GOAL_ALIGN_POST = 5
 GOAL_ALIGN_DELAY = 6
 GOAL_ALIGN_INIT = 7
 GOAL_ALIGN_ANGLE = 8
-AUTO_READY = 9
+
 PAUSE = 10
+
 WALK_STARTING = 11
 WALK_STOPING = 12
+
+WALK_2_SHOOTING = 13
+WALK_2_SHOOTING_2 = 18
+INIT_SHOOTING = 14
+SHOOTING = 15
+FINISH_SHOOTING = 16
+SHOOTING_2_WALK = 17
+SHOOTING_2_WALK_2 = 19
+SHOOTING_2_WALK_FINISH = 20
 
 state = 0
 
@@ -34,6 +45,11 @@ gt = None
 infer = None
 bt = None
 walk = None
+
+pubMotionIndex = None
+isActionRunning = None
+pubEnaMod = None
+pubEnableOffset = None
 
 enabled = True
 goal_align_time = 0.0
@@ -61,6 +77,8 @@ timed_delay = 0
 
 initialized = False
 
+actionEnabled = False
+
 def set_state(new_state, _timed_start = 0, _timed_delay = 0):
     global state
     global timed_start
@@ -69,8 +87,33 @@ def set_state(new_state, _timed_start = 0, _timed_delay = 0):
     timed_delay = _timed_delay
     timed_start = _timed_start
 
+def init_action(_pubMotionIndex, _isActionRunning, _pubEnaMod, _pubEnableOffset):
+    global pubMotionIndex
+    global isActionRunning
+    global pubEnaMod
+    global pubEnableOffset
+    pubMotionIndex = _pubMotionIndex
+    isActionRunning = _isActionRunning
+    pubEnaMod = _pubEnaMod
+    pubEnableOffset = _pubEnableOffset
 
+def enableWalk():
+    global actionEnabled
+    actionEnabled = False
+    pubEnaMod.publish("walking_module")
+    pubEnaMod.publish("head_control_module")
 
+def enableAction():
+    global actionEnabled
+    actionEnabled = True
+    pubEnaMod.publish("action_module")
+    pubEnaMod.publish("head_control_module")
+
+def playAction(index):
+    pubMotionIndex.publish(index)
+
+def stopAction():
+    pubMotionIndex.publish(-2)
 
 def init(goal_tracker, inference, ball_tracker, walking, _setwalkparams, _setwalkcmd):
     global gt
@@ -153,19 +196,51 @@ def run(time, dets, track_ball, head_control):
 
     elif state == GOAL_ALIGN_ANGLE: # yaw turning
         if timedEnd:
-            state = GOAL_ALIGN_INIT
+            set_state(GOAL_ALIGN_INIT)
 
     elif state == WALK_STARTING:
         walk.setTarget(Vector2yaw(0.0, 0.1, 0.0))
         if timedEnd:
-            state = BALL_SEARCHING
+            set_state(BALL_SEARCHING)
             
     elif state == WALK_STOPING:
         walk.setTarget(Vector2yaw(0.0, 0.1, 0.0))
         if timedEnd:
             setwalkcmd("stop")
-            state = PAUSE
+            set_state(PAUSE)
+        
+    elif state == WALK_2_SHOOTING:
+        enableAction()
+        set_state(WALK_2_SHOOTING_2, time, 3)
+    elif state == WALK_2_SHOOTING_2:
+        # if timedEnd:
+        pubEnableOffset.publish(False)
+        set_state(INIT_SHOOTING, time, 1)
+    elif state == SHOOTING_2_WALK:
+        if timedEnd:
+            set_state(SHOOTING_2_WALK_2, time, 1)
+    elif state == SHOOTING_2_WALK_2:
+        if timedEnd:
+            enableWalk()
+            pubEnableOffset.publish(True)
+            set_state(SHOOTING_2_WALK_FINISH, time, 1)
+    
+    elif state == FINISH_SHOOTING:
+        if timedEnd:
+            set_state(SHOOTING_2_WALK, time, 0.5)
 
+    elif state == INIT_SHOOTING:
+        # if timedEnd:
+        playAction(10)
+        set_state(SHOOTING, time, 4)
+    
+    elif state == SHOOTING:
+        if timedEnd:
+            stopAction()
+            set_state(FINISH_SHOOTING, time, 0.5)
+    elif state == SHOOTING_2_WALK_FINISH:
+        set_state(PAUSE)
+        
     # elif state == GOAL_ALIGN_DELAY:
     #     # if time - goal_align_post_start > goal_align_post_interval:
     #     #     gt.enabled = True

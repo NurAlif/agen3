@@ -27,11 +27,12 @@ from walking import Vector2, Vector2yaw, CONTROL_MODE_HEADLESS, CONTROL_MODE_YAW
 from walk_utils import joints, getWalkParamsDict, setWalkParamsConvert
 
 
-from std_msgs.msg import String
+from std_msgs.msg import String, Int32, Bool
 from robotis_controller_msgs.msg import SyncWriteItem, StatusMsg
 from op3_walking_module_msgs.msg import WalkingParam, WalkingCorrection
 from sensor_msgs.msg import Imu, JointState
 from op3_walking_module_msgs.srv import GetWalkingParam
+from op3_action_module_msgs.srv import IsRunning
 from robotis_controller_msgs.srv import LoadOffset
 
     
@@ -44,6 +45,8 @@ pubWalkCmd = rospy.Publisher('/robotis/walking/command', String, queue_size=10)
 pubSetParams = rospy.Publisher('/robotis/walking/set_params', WalkingParam, queue_size=10)
 pubWalkCorr = rospy.Publisher('walking_correction', WalkingCorrection, queue_size=10)
 pubHeadControl = rospy.Publisher('/robotis/head_control/set_joint_states', JointState, queue_size=1)
+pubMotionIndex = rospy.Publisher('/robotis/action/page_num', Int32, queue_size=10)
+pubEnableOffset = rospy.Publisher('/robotis/enable_offset', Bool, queue_size=10)
 
 OFFSET_PATH = "/home/name/agen3/src/ROBOTIS-OP3/op3_tuning_module/data/offset.yaml"
 
@@ -163,6 +166,11 @@ async def ws_handler(websocket, path):
                 handleGoalTrack()
             elif cmd == 'save_goal_track':
                 saveGoalTrack(data['params'])
+            elif cmd == 'shoot_trigger':
+                # if striker.actionEnabled:
+                #     striker.set_state(striker.SHOOTING_2_WALK)
+                # else:
+                striker.set_state(striker.WALK_2_SHOOTING)
 
     finally:
         del connected_clients[client_id]
@@ -462,6 +470,16 @@ def walk_toggle(_on):
         striker.set_state(striker.WALK_STARTING, time.time(), 2.0)
     else: striker.set_state(striker.WALK_STOPING, time.time(), 1.0)
 
+def isActionRunning():
+    rospy.wait_for_service('/robotis/action/is_running')
+    try:
+        getParams = rospy.ServiceProxy('/robotis/action/is_running', IsRunning)
+        resp = getParams()
+        global action_status
+        action_status = resp.is_running
+    except rospy.ServiceException as e:
+        print("Service call failed: %s"%e)
+
 def gamestate_callback(data):
     if(data.data == "play"):
         walk_toggle(True)
@@ -515,6 +533,7 @@ def main():
     goal_scan_interval = 5.0 
 
     striker.init(goaltracker, inference, ball_tracking, walking, setWalkParams, setWalkCmd)
+    striker.init_action(pubMotionIndex, isActionRunning, pubEnaMod, pubEnableOffset)
 
     while not rospy.is_shutdown():
         # try:

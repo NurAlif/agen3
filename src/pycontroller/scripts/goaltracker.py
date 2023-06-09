@@ -57,7 +57,7 @@ enabled = False
 
 class Goal:
     def __init__(self):
-        self.theta = (0.0, 0.0)  #which angle goal detected
+        self.theta = np.array([0.0, 0.0])  #which angle goal detected
         self.grad = 0.0  #left-right gradient
         self.span = 1.0  #left-right span 
         self.found = False
