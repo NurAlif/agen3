@@ -70,7 +70,7 @@ int main(int argc, char **argv)
   ros::init(argc, argv, "THORMANG3 Action Editor");
   ros::NodeHandle nh;
 
-  std::string offset_file   = nh.param<std::string>("offset_table", "");
+  std::string offset_file   = nh.param<std::string>("offset_file_path", "");
   std::string robot_file    = nh.param<std::string>("robot_file_path", "");
   std::string dxl_init_file = nh.param<std::string>("init_file_path", "");
   std::string _device_name = nh.param<std::string>("device_name", SUB_CONTROLLER_DEVICE);

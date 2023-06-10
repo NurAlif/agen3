@@ -211,35 +211,27 @@ def run(time, dets, track_ball, head_control):
         
     elif state == WALK_2_SHOOTING:
         enableAction()
-        set_state(WALK_2_SHOOTING_2, time, 3)
-    elif state == WALK_2_SHOOTING_2:
-        # if timedEnd:
-        pubEnableOffset.publish(False)
-        set_state(INIT_SHOOTING, time, 1)
+        set_state(INIT_SHOOTING, time, 0.5)
+
     elif state == SHOOTING_2_WALK:
         if timedEnd:
-            set_state(SHOOTING_2_WALK_2, time, 1)
-    elif state == SHOOTING_2_WALK_2:
-        if timedEnd:
             enableWalk()
-            pubEnableOffset.publish(True)
-            set_state(SHOOTING_2_WALK_FINISH, time, 1)
+            set_state(SHOOTING_2_WALK_FINISH, time, 0.02)
     
     elif state == FINISH_SHOOTING:
         if timedEnd:
-            set_state(SHOOTING_2_WALK, time, 0.5)
+            set_state(SHOOTING_2_WALK, time, 0)
 
     elif state == INIT_SHOOTING:
-        # if timedEnd:
-        playAction(10)
-        set_state(SHOOTING, time, 4)
+        playAction(12)
+        set_state(SHOOTING, time, 6)
     
     elif state == SHOOTING:
         if timedEnd:
             stopAction()
-            set_state(FINISH_SHOOTING, time, 0.5)
+            set_state(FINISH_SHOOTING, time, 0.1)
     elif state == SHOOTING_2_WALK_FINISH:
-        set_state(PAUSE)
+        set_state(WALK_STARTING)
         
     # elif state == GOAL_ALIGN_DELAY:
     #     # if time - goal_align_post_start > goal_align_post_interval:

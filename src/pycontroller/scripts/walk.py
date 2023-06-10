@@ -338,7 +338,7 @@ def updateAngle():
     yaw = striker.yaw
     if yaw != striker.last_yaw:
         striker.last_yaw = yaw
-    send_message(-1, 'angle_update', yaw)
+    # send_message(-1, 'angle_update', yaw)
 
 def setWalkCmd(walkCmd):
     global is_walking
@@ -428,8 +428,6 @@ def handleImu(imu_msg_):
 def handleBalanceMonitor(msg):
     send_message(-1, "balance_monitor", msg.data)
 
-def onFinishInitPose():
-    enableWalk()
 
 def sendWalkCorrectionConf():
     wc = WalkingCorrection()
@@ -518,12 +516,20 @@ def main():
     reloadBallTrackerHandle()
     handleLoadWalkingConf()
 
+    striker.init(goaltracker, inference, ball_tracking, walking, setWalkParams, setWalkCmd)
+    striker.init_action(pubMotionIndex, isActionRunning, pubEnaMod, pubEnableOffset)
+
     if(inference.startInference() < 0):
         rospy.loginfo("Inference Start ERROR")
         raise SystemExit('ERROR: failed to start inference!')
     else:
-        setWalkParams(["balance_enable", 1])
         rospy.loginfo("Inference Started")
+        # time.sleep(1)
+        # pubEnableOffset.publish(False)
+        # time.sleep(1)
+        # pubEnableOffset.publish(True)
+        # time.sleep(1)
+        setWalkParams(["balance_enable", 1])
 
     global lastSendParamTic
     global track_ball
@@ -531,9 +537,6 @@ def main():
 
     last_goal_scan = 0.0
     goal_scan_interval = 5.0 
-
-    striker.init(goaltracker, inference, ball_tracking, walking, setWalkParams, setWalkCmd)
-    striker.init_action(pubMotionIndex, isActionRunning, pubEnaMod, pubEnableOffset)
 
     while not rospy.is_shutdown():
         # try:
