@@ -81,7 +81,11 @@ movement = [0,0] # move, yaw
 
 is_walking = False
 
+gc_state = "initial"
+enable_gc = 0
+
 async def ws_handler(websocket, path):
+    global enable_gc
     client_id = id(websocket)
     connected_clients[client_id] = websocket
 
@@ -170,7 +174,18 @@ async def ws_handler(websocket, path):
                 # if striker.actionEnabled:
                 #     striker.set_state(striker.SHOOTING_2_WALK)
                 # else:
-                striker.set_state(striker.WALK_2_SHOOTING)
+                # striker.set_state(striker.WALK_2_SHOOTING)
+                striker.set_state(striker.AUTO_PLAY)
+            elif cmd == 'set_state':
+                striker.set_state(int(data['params']))
+            elif cmd == 'set_ready_time':
+                striker.ready_time = float(data['params'])
+            elif cmd == 'set_play_delay':
+                striker.play_delay = float(data['params'])
+            elif cmd == 'enable_gc':
+                enable_gc = int(data['params'])
+            elif cmd == 'reset_yaw':
+                striker.yaw = 0.0
 
     finally:
         del connected_clients[client_id]
@@ -338,7 +353,7 @@ def updateAngle():
     yaw = striker.yaw
     if yaw != striker.last_yaw:
         striker.last_yaw = yaw
-    # send_message(-1, 'angle_update', yaw)
+    send_message(-1, 'angle_update', yaw)
 
 def setWalkCmd(walkCmd):
     global is_walking
@@ -464,7 +479,6 @@ def handleStatusMsg(statusMsg):
 def walk_toggle(_on):
     if not striker.initialized: return
     if _on:
-        setWalkCmd("start") 
         striker.set_state(striker.WALK_STARTING, time.time(), 2.0)
     else: striker.set_state(striker.WALK_STOPING, time.time(), 1.0)
 
@@ -479,10 +493,15 @@ def isActionRunning():
         print("Service call failed: %s"%e)
 
 def gamestate_callback(data):
-    if(data.data == "play"):
-        walk_toggle(True)
-    else:
-        walk_toggle(False)
+    global gc_state
+    new_gc_state = data.data
+    print("GC COMMAND in :"+new_gc_state)
+    if(new_gc_state == "play" and new_gc_state != gc_state):
+        striker.set_state(striker.AUTO_PLAY)
+        gc_state = new_gc_state
+    elif(new_gc_state == "ready" and new_gc_state != gc_state):
+        striker.set_state(striker.AUTO_READY, time.time(), 3)
+        gc_state = new_gc_state
 
 def main():
     global server

@@ -4,7 +4,7 @@ import socket
 import rospy
 from std_msgs.msg import String
 
-ip = "192.168.0.255"
+ip = "255.255.255.255"
 port = 3838
 
 mode = 0
@@ -44,6 +44,7 @@ def talker():
                             if(data[3+i] == 6):
                                 if(current_state != data[4+i]):
                                     current_state = data[4+i]
+                                    if current_state > 4: break
                                     state_str = game_states[current_state]
                                     rospy.loginfo(state_str)
                                     pub.publish(state_str)

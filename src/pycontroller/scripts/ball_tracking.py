@@ -92,8 +92,8 @@ def set_py_from_buff():
 
     buf_item = scan_bufer[0]
 
-    if(size_buff > 15):
-        buf_item = scan_bufer[-15]
+    if(size_buff > 10):
+        buf_item = scan_bufer[-10]
 
     back_yaw = 0
     if(buf_item[2] == 1):
@@ -116,20 +116,20 @@ def search(time):
         if delta_last_search >= turn_speed_delay:
             yaw = max_yaw
             last_search_turn = time
-            pitch += 0.25
+            pitch -= 0.25
             search_state = 2
-            if pitch >= max_pitch+0.1: search_state = 0
+            if pitch >= min_pitch: search_state = 0
 
     elif(search_state == 2):
         scan_bufer.append((pitch, delta_last_search, search_state))
         if time - last_search_turn >= turn_speed_delay:
             yaw = min_yaw
             last_search_turn = time
-            pitch += 0.25
+            pitch-= 0.25
             search_state = 1
-            if pitch >= max_pitch+0.1: search_state = 0
+            if pitch >= min_pitch: search_state = 0
         
     elif search_state == 0:
         yaw = min_yaw+0.3
-        pitch = min_pitch
+        pitch = max_pitch
         search_state = 1

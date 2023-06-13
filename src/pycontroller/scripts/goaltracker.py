@@ -166,5 +166,7 @@ def track(unclustered_goals):
         # goal.setall2(mean_right.item(1), mean_left.item(1), True)
         goal.theta = center
         goal.found = True
+        goal.span = (mean_right - mean_left)[0]
+        print("span: "+str(goal.span))
 
-    else: goal.found = False
+    else: goal.found = False 
