@@ -3,45 +3,49 @@
 # catch ball, move ball towards goal
 # shoot
 
+# convention:
+# PRE - > ING -> mas juga
+
 from walking import Vector2yaw
+import time
 
 # repeat
 
-
-
-AUTO_READY = 21
-AUTO_READY_2 = 22
-AUTO_READY_FINAL = 23
-AUTO_PLAY = 24
-AUTO_READY_3 = 27
-
 BALL_SEARCHING = 0
-BALL_APPROACH = 1
-GOAL_ALIGN = 2
-GOAL_ALIGN_2_PUSH = 3
-GOAL_ALIGN_2_SHOOT = 25
-GOAL_ALIGN_2_SHOOT_2 = 26
-GOAL_ALIGN_POST = 5
-GOAL_ALIGN_DELAY = 6
-GOAL_ALIGN_INIT = 7
-GOAL_ALIGN_ANGLE = 8
 
-PAUSE = 10
+PAUSE = 1
 
-WALK_STARTING = 11
-WALK_STOPING = 12
+AUTO_READY_INIT = 2
+AUTO_READY_INIT_STARTING = 3
+AUTO_READY_POSITIONING = 4
+AUTO_READY_POST = 5
+AUTO_READY_TURNING = 6
 
-WALK_2_SHOOTING = 13
-WALK_2_SHOOTING_2 = 18
-INIT_SHOOTING = 14
-SHOOTING = 15
-FINISH_SHOOTING = 16
-SHOOTING_2_WALK = 17
-SHOOTING_2_WALK_2 = 19
-SHOOTING_2_WALK_FINISH = 20
+AUTO_PLAY = 7
 
-GOAL_ALIGN_BY_YAW = 28
-GOAL_ALIGN_BY_YAW_2 = 29
+WALK_2_SHOOT_INIT_1 = 8
+WALK_2_SHOOT_INIT_2 = 9
+WALK_2_SHOOT_INIT_3 = 10
+
+GOAL_SCAN_INIT = 11
+GOAL_SCANING = 12
+
+
+WALK_INIT = 13
+WALK_INIT_STARTING = 14
+
+WALK_STOP_INIT = 15
+WALK_STOPING = 16
+
+SHOOTING_INIT = 17
+SHOOTING = 18
+SHOOTING_POST = 19
+
+SHOOTING_2_WALK = 20
+SHOOTING_2_WALK_POST = 21
+
+GOAL_ALIGN_BY_YAW_INIT = 22
+GOAL_ALIGN_BY_YAW_TURNING = 23
 
 state = PAUSE
 
@@ -92,14 +96,21 @@ play_delay = 4
 
 turn_yaw_max_rate = 0.65
 
-def set_state(new_state, _timed_start = 0, _timed_delay = 0):
+def clamp(val, _min, _max):
+    return max(min(val, _max), _min)
+
+def plus_or_min(val, out):
+    if val > 0: return out
+    return -out
+
+def set_state(new_state, _timed_delay = 0):
     global state
     global timed_start
     global timed_delay
     state = new_state
     timed_delay = _timed_delay
-    timed_start = _timed_start
-    print("NEW STATE:"+str(new_state))
+    timed_start = time.time()
+    print("NEW STATE: "+str(new_state))
 
 def init_action(_pubMotionIndex, _isActionRunning, _pubEnaMod, _pubEnableOffset):
     global pubMotionIndex
@@ -160,173 +171,140 @@ def run(time, dets, track_ball, head_control):
     deltaT = time - timed_start
     timedEnd = deltaT > timed_delay
 
+    head_pitch = head_control[0]
+    head_yaw = head_control[1]
+    goal = gt.goal
+    goal_theta = goal.theta.item(0)
+
     if show_head_angle:
-        print("head py:"+str(head_control[0])+", "+str(head_control[1]))
+        print("head py:"+str(head_pitch)+", "+str(head_yaw))
 
     if state == BALL_SEARCHING:
         move = 0.1
         if bt.isEnabled and not gt.enabled and infer.ball_lock: 
             if head_control[0] >= -0.57:
                 move = 0.6
-            if head_control[0] < -0.57 and abs(head_control[1]) < 0.1 :
+            if head_control[0] < -0.57 and abs(head_yaw) < 0.1 :
                 if abs(yaw) < 0.25:
-                    set_state(GOAL_ALIGN_INIT)
-                    print("goaling")
+                    set_state(GOAL_SCAN_INIT)
                 else:
-                    print("yawing")
-                    set_state(GOAL_ALIGN_BY_YAW)
+                    set_state(GOAL_ALIGN_BY_YAW_INIT)
                 return
-        yaw_control = min(max(head_control[1], -turn_yaw_max_rate), turn_yaw_max_rate)
-        walk.setTarget(Vector2yaw(0.0, move, yaw_control))
+        yaw_control = clamp(head_yaw, -turn_yaw_max_rate, turn_yaw_max_rate )
+        walk.setTarget(0.0, move, yaw_control)
 
-    elif state == GOAL_ALIGN_INIT: # init scan
+    elif state == GOAL_SCAN_INIT: # init scan
         gt.enabled = True
-        gt.pre_head_pos[0] = head_control[0]
-        gt.pre_head_pos[1] = head_control[1]
-        walk.setTarget(Vector2yaw(0.0, 0.11, 0.0))
-        set_state(GOAL_ALIGN)
+        gt.set_pre_head_pos(head_control)
+        walk.setTarget(y=0.11)
+        set_state(GOAL_SCANING)
     
-    elif state == GOAL_ALIGN_BY_YAW:
-        goal = gt.goal
-        turn_gain = -1.4
-        if(-yaw > 0.0): turn_gain = 1.4
-        x_gain = turn_gain
-        yaw_gain = max(min(turn_gain, 0.4), -0.4)
-        walk.setTarget(Vector2yaw(-x_gain , 0.13, yaw_gain))
+    elif state == GOAL_ALIGN_BY_YAW_INIT:
+        turn_gain = plus_or_min(-yaw, 1.4)
+        yaw_gain = clamp(turn_gain, -0.4, 0.4)
+        walk.setTarget(-turn_gain , 0.13, yaw_gain)
         setwalkparams(["z_move_amplitude", 0.03])
         print("yaw : "+str(yaw))
-        print("time : "+str(abs(yaw) * 10))
-        set_state(GOAL_ALIGN_BY_YAW_2, time, abs(yaw) * 6)
+        print("time : "+str(abs(yaw) * 6))
+        set_state(GOAL_ALIGN_BY_YAW_TURNING, abs(yaw) * 6)
 
-    elif state == GOAL_ALIGN_BY_YAW_2:
+    elif state == GOAL_ALIGN_BY_YAW_TURNING:
         if timedEnd:
             yaw = 0.0
-            set_state(GOAL_ALIGN_INIT)
+            set_state(GOAL_SCAN_INIT)
 
-    elif state == GOAL_ALIGN: # done scan & init turning
-        goal = gt.goal
+    elif state == GOAL_SCANING:
         if not gt.enabled and goal.found:
-            # if goal.span < 
+            turn_gain = plus_or_min(goal_theta, 1.5)
 
-            turn_gain = -1.5
-            if(goal.theta.item(0) > 0.0): turn_gain = 1.5
-            x_gain = turn_gain
-            yaw_gain = max(min(turn_gain, 0.4), -0.4)
-            walk.setTarget(Vector2yaw(-x_gain , 0.11, yaw_gain))
+            yaw_gain = clamp(turn_gain, -0.4, 0.4)
+            walk.setTarget(-turn_gain , 0.11, yaw_gain)
             setwalkparams(["z_move_amplitude", 0.03])
-            print("X_GAIN: ", str(-x_gain))
-            set_state(GOAL_ALIGN_2_SHOOT, time, abs(goal.theta.item(0)) * 6)
-
-    elif state == GOAL_ALIGN_2_PUSH: # turning
-        goal = gt.goal
-        if timedEnd:
-            walk.setTarget(Vector2yaw(0.0, 0.8, 0.0))
-            setwalkparams(["z_move_amplitude", 0.02])
-            set_state(GOAL_ALIGN_POST)
+            set_state(WALK_2_SHOOT_INIT_1, abs(goal_theta) * 6)
     
-    elif state == GOAL_ALIGN_2_SHOOT: # turning
+    elif state == WALK_2_SHOOT_INIT_1:
         if timedEnd:
             setwalkcmd("stop")
-            set_state(GOAL_ALIGN_2_SHOOT_2, time, 2.1)
+            set_state(WALK_2_SHOOT_INIT_2, 2.1)
     
-    elif state == GOAL_ALIGN_2_SHOOT_2:
+    elif state == WALK_2_SHOOT_INIT_2:
         if timedEnd:
             enableAction()
-            set_state(WALK_2_SHOOTING, time, 1)
- 
-    elif state == GOAL_ALIGN_POST:
-        current_head_yaw = head_control[1]
-        if abs(current_head_yaw) > 0.9:
-            goal = gt.goal
-            turn_gain = -0.8
-            head_control[1] = current_head_yaw * 0.3
-            if(goal.theta.item(0) > 0.0): turn_gain = 0.8
-            yaw_gain = max(min(turn_gain, 0.4), -0.4)
-            walk.setTarget(Vector2yaw(0.0, 0.11, yaw_gain))
-            set_state(GOAL_ALIGN_ANGLE, time + 1, abs(current_head_yaw*2))
+            set_state(WALK_2_SHOOT_INIT_3, 1)
 
-    elif state == GOAL_ALIGN_ANGLE: # yaw turning
-        if timedEnd:
-            set_state(GOAL_ALIGN_INIT)
+    elif state == WALK_INIT:
+        setwalkcmd("start")
+        yaw = 0.0
+        walk.setTarget(y=0.1)
+        set_state(WALK_INIT_STARTING, play_delay)
 
-    elif state == WALK_STARTING:
+    elif state == WALK_INIT_STARTING:
         if timedEnd:
             set_state(BALL_SEARCHING)
-            
+
+    elif state == WALK_STOP_INIT:
+        walk.setTarget(y=0.1)
+        set_state(WALK_STOPING, 1)
     elif state == WALK_STOPING:
-        walk.setTarget(Vector2yaw(0.0, 0.1, 0.0))
         if timedEnd:
             setwalkcmd("stop")
             set_state(PAUSE)
         
-    elif state == WALK_2_SHOOTING:
+    elif state == WALK_2_SHOOT_INIT_3:
         if timedEnd:
-            set_state(INIT_SHOOTING, time, 0.5)
+            set_state(SHOOTING_INIT, 0.5)
 
     elif state == SHOOTING_2_WALK:
         if timedEnd:
             enableWalk()
-            set_state(SHOOTING_2_WALK_FINISH, time, 0.02)
+            set_state(SHOOTING_2_WALK_POST, 0.5)
     
-    elif state == FINISH_SHOOTING:
+    elif state == SHOOTING_POST:
         if timedEnd:
-            set_state(SHOOTING_2_WALK, time, 0)
+            set_state(SHOOTING_2_WALK, 0)
 
-    elif state == INIT_SHOOTING:
+    elif state == SHOOTING_INIT:
         playAction(12)
         set_state(SHOOTING, time, 6)
     
     elif state == SHOOTING:
         if timedEnd:
             stopAction()
-            set_state(FINISH_SHOOTING, time, 0.1)
+            set_state(SHOOTING_POST, 0.1)
 
-    elif state == SHOOTING_2_WALK_FINISH:
-        setwalkcmd("start")
-        walk.setTarget(Vector2yaw(0.0, 0.1, 0.0))
-        set_state(WALK_STARTING, time, 3)
+    elif state == SHOOTING_2_WALK_POST:
+        walk.setTarget(y=0.1)
+        set_state(WALK_INIT_STARTING, 3)
     
-    elif state == AUTO_READY:
+    elif state == AUTO_READY_INIT:
         setwalkcmd("start")
-        walk.setTarget(Vector2yaw(0.0, 0.1, 0.0))
+        yaw = 0.0
+        walk.setTarget(y=0.1)
+        set_state(AUTO_READY_INIT_STARTING, 3)
+
+    elif state == AUTO_READY_INIT_STARTING:
         if timedEnd:
-            walk.setTarget(Vector2yaw(0.0, 0.7, 0.0))
-            set_state(AUTO_READY_2, time, ready_time)
+            walk.setTarget(y=0.7)
+            set_state(AUTO_READY_POSITIONING, ready_time)
     
-    elif state == AUTO_READY_2:
+    elif state == AUTO_READY_POSITIONING:
         if timedEnd:
-            walk.setTarget(Vector2yaw(0.0, 0.1, 0.5))
-            set_state(AUTO_READY_3, time, 3)
+            walk.setTarget(0.0, 0.1, 0.5)
+            set_state(AUTO_READY_TURNING, 3)
 
-    elif state == AUTO_READY_3:
+    elif state == AUTO_READY_TURNING:
         if timedEnd:
-            walk.setTarget(Vector2yaw(0.0, 0.1, 0.0))
-            set_state(AUTO_READY_FINAL, time, 1 )
+            walk.setTarget(y=0.1)
+            set_state(AUTO_READY_POST, 1 )
 
-    elif state == AUTO_READY_FINAL:
+    elif state == AUTO_READY_POST:
         if timedEnd:
-            set_state(WALK_STOPING, time, 1)
+            set_state(WALK_STOPING, 1)
     
     elif state == AUTO_PLAY:
         setwalkcmd("start")
-        yaw = 0.0
-        walk.setTarget(Vector2yaw(0.0, 0.1, 0.0))
-        set_state(WALK_STARTING, time, play_delay)
+        set_state(WALK_INIT, play_delay)
 
     elif state == PAUSE:
         if timedEnd:
-            set_state(PAUSE, time, 3)
-        
-    # elif state == GOAL_ALIGN_DELAY:
-    #     # if time - goal_align_post_start > goal_align_post_interval:
-    #     #     gt.enabled = True
-    #     #     gt.pre_head_pos[0] = head_control[0]
-    #     #     gt.pre_head_pos[1] = head_control[1]
-    #     #     walk.setTarget(Vector2yaw(0.0, 0.1, 0.0))
-    #     #     state = GOAL_ALIGN
-
-    #     # move = 0.1
-    #     # if head_control[0] > -0.20: 
-    #     move = 0.8
-    #     # walk.setTarget(Vector2yaw(0.0, move, head_control[1]))
-        
+            print("on pause...")

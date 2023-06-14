@@ -75,6 +75,11 @@ class Goal:
 
 goal = Goal()
 
+def set_pre_head_pos(_head_pos):
+    global pre_head_pos
+    pre_head_pos[0] = _head_pos[0]
+    pre_head_pos[1] = _head_pos[1]
+
 def scan(dets):
     in_goals = dets.goals
     global lastTic 

@@ -479,8 +479,8 @@ def handleStatusMsg(statusMsg):
 def walk_toggle(_on):
     if not striker.initialized: return
     if _on:
-        striker.set_state(striker.WALK_STARTING, time.time(), 2.0)
-    else: striker.set_state(striker.WALK_STOPING, time.time(), 1.0)
+        striker.set_state(striker.WALK_INIT_STARTING,  2.0)
+    else: striker.set_state(striker.WALK_STOPING,  1.0)
 
 def isActionRunning():
     rospy.wait_for_service('/robotis/action/is_running')
@@ -500,7 +500,7 @@ def gamestate_callback(data):
         striker.set_state(striker.AUTO_PLAY)
         gc_state = new_gc_state
     elif(new_gc_state == "ready" and new_gc_state != gc_state):
-        striker.set_state(striker.AUTO_READY, time.time(), 3)
+        striker.set_state(striker.AUTO_READY_INIT_STARTING, 3)
         gc_state = new_gc_state
 
 def main():
