@@ -81,6 +81,9 @@ class Walking:
 
     def setTarget(self, newTarget): # normalized input
         self.vectorTarget = Vector2yaw.add(Vector2yaw.multiply(newTarget, self.vectorMultiplier), self.stationary_offset)
+    
+    def setTarget(self, x=0.0, y=0.0, yaw=0.0): # normalized input
+        self.vectorTarget = Vector2yaw.add(Vector2yaw.multiply(Vector2yaw(x,y,yaw), self.vectorMultiplier), self.stationary_offset)
 
     def stepToTargetVel(self):
         self.vectorCurrent.stepToTarget(self.vectorTarget, self.step)
