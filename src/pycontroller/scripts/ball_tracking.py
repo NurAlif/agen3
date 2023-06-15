@@ -118,7 +118,7 @@ def search(time):
             last_search_turn = time
             pitch -= 0.25
             search_state = 2
-            if pitch >= min_pitch: search_state = 0
+            if pitch <= min_pitch: search_state = 0
 
     elif(search_state == 2):
         scan_bufer.append((pitch, delta_last_search, search_state))
@@ -127,7 +127,7 @@ def search(time):
             last_search_turn = time
             pitch-= 0.25
             search_state = 1
-            if pitch >= min_pitch: search_state = 0
+            if pitch <= min_pitch: search_state = 0
         
     elif search_state == 0:
         yaw = min_yaw+0.3

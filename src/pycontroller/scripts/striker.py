@@ -47,6 +47,33 @@ SHOOTING_2_WALK_POST = 21
 GOAL_ALIGN_BY_YAW_INIT = 22
 GOAL_ALIGN_BY_YAW_TURNING = 23
 
+states_dict = {
+    0 : "BALL_SEARCHING",
+    1 : "PAUSE",
+    2 : "AUTO_READY_INIT",
+    3 : "AUTO_READY_INIT_STARTING",
+    4 : "AUTO_READY_POSITIONING",
+    5 : "AUTO_READY_POST",
+    6 : "AUTO_READY_TURNING",
+    7 : "AUTO_PLAY",
+    8 : "WALK_2_SHOOT_INIT_1",
+    9 : "WALK_2_SHOOT_INIT_2",
+    10 : "WALK_2_SHOOT_INIT_3",
+    11 : "GOAL_SCAN_INIT",
+    12 : "GOAL_SCANING",
+    13 : "WALK_INIT",
+    14 : "WALK_INIT_STARTING",
+    15 : "WALK_STOP_INIT",
+    16 : "WALK_STOPING",
+    17 : "SHOOTING_INIT",
+    18 : "SHOOTING",
+    19 : "SHOOTING_POST",
+    20 : "SHOOTING_2_WALK",
+    21 : "SHOOTING_2_WALK_POST",
+    22 : "GOAL_ALIGN_BY_YAW_INIT",
+    23 : "GOAL_ALIGN_BY_YAW_TURNING",
+}
+
 state = PAUSE
 
 yaw_dead_area = 0.15
@@ -96,6 +123,9 @@ play_delay = 4
 
 turn_yaw_max_rate = 0.65
 
+time_play_start = 0
+max_time_from_play = 1000
+
 def clamp(val, _min, _max):
     return max(min(val, _max), _min)
 
@@ -110,7 +140,7 @@ def set_state(new_state, _timed_delay = 0):
     state = new_state
     timed_delay = _timed_delay
     timed_start = time.time()
-    print("NEW STATE: "+str(new_state))
+    print("NEW STATE: "+states_dict[new_state])
 
 def init_action(_pubMotionIndex, _isActionRunning, _pubEnaMod, _pubEnableOffset):
     global pubMotionIndex
@@ -167,6 +197,7 @@ def run(time, dets, track_ball, head_control):
     global goal_align_angle_start
     global goal_align_angle_time
     global yaw
+    global time_play_start
 
     deltaT = time - timed_start
     timedEnd = deltaT > timed_delay
@@ -180,32 +211,33 @@ def run(time, dets, track_ball, head_control):
         print("head py:"+str(head_pitch)+", "+str(head_yaw))
 
     if state == BALL_SEARCHING:
-        move = 0.1
+        move = 0.65
         if bt.isEnabled and not gt.enabled and infer.ball_lock: 
-            if head_control[0] >= -0.57:
-                move = 0.6
+            if head_control[0] < -0.5: move = 0.25
             if head_control[0] < -0.57 and abs(head_yaw) < 0.1 :
                 if abs(yaw) < 0.25:
                     set_state(GOAL_SCAN_INIT)
-                else:
+                elif time - time_play_start < max_time_from_play:
                     set_state(GOAL_ALIGN_BY_YAW_INIT)
-                return
-        yaw_control = clamp(head_yaw, -turn_yaw_max_rate, turn_yaw_max_rate )
+                else:
+                    set_state(GOAL_SCAN_INIT)
+                return 
+        yaw_control = plus_or_min(head_yaw, 0.55)
+        if abs(head_yaw) < 0.1:
+            yaw_control = plus_or_min(head_yaw, 0.25)
         walk.setTarget(0.0, move, yaw_control)
 
     elif state == GOAL_SCAN_INIT: # init scan
         gt.enabled = True
         gt.set_pre_head_pos(head_control)
-        walk.setTarget(y=0.11)
+        walk.setTarget()
         set_state(GOAL_SCANING)
     
     elif state == GOAL_ALIGN_BY_YAW_INIT:
         turn_gain = plus_or_min(-yaw, 1.4)
         yaw_gain = clamp(turn_gain, -0.4, 0.4)
-        walk.setTarget(-turn_gain , 0.13, yaw_gain)
+        walk.setTarget(-turn_gain , 0.0, yaw_gain)
         setwalkparams(["z_move_amplitude", 0.03])
-        print("yaw : "+str(yaw))
-        print("time : "+str(abs(yaw) * 6))
         set_state(GOAL_ALIGN_BY_YAW_TURNING, abs(yaw) * 6)
 
     elif state == GOAL_ALIGN_BY_YAW_TURNING:
@@ -218,14 +250,15 @@ def run(time, dets, track_ball, head_control):
             turn_gain = plus_or_min(goal_theta, 1.5)
 
             yaw_gain = clamp(turn_gain, -0.4, 0.4)
-            walk.setTarget(-turn_gain , 0.11, yaw_gain)
+            walk.setTarget(-turn_gain , 0.0, yaw_gain)
             setwalkparams(["z_move_amplitude", 0.03])
             set_state(WALK_2_SHOOT_INIT_1, abs(goal_theta) * 6)
     
     elif state == WALK_2_SHOOT_INIT_1:
         if timedEnd:
+            walk.setTarget()
             setwalkcmd("stop")
-            set_state(WALK_2_SHOOT_INIT_2, 2.1)
+            set_state(WALK_2_SHOOT_INIT_2, 3)
     
     elif state == WALK_2_SHOOT_INIT_2:
         if timedEnd:
@@ -235,7 +268,7 @@ def run(time, dets, track_ball, head_control):
     elif state == WALK_INIT:
         setwalkcmd("start")
         yaw = 0.0
-        walk.setTarget(y=0.1)
+        walk.setTarget()
         set_state(WALK_INIT_STARTING, play_delay)
 
     elif state == WALK_INIT_STARTING:
@@ -243,7 +276,7 @@ def run(time, dets, track_ball, head_control):
             set_state(BALL_SEARCHING)
 
     elif state == WALK_STOP_INIT:
-        walk.setTarget(y=0.1)
+        walk.setTarget()
         set_state(WALK_STOPING, 1)
     elif state == WALK_STOPING:
         if timedEnd:
@@ -252,34 +285,35 @@ def run(time, dets, track_ball, head_control):
         
     elif state == WALK_2_SHOOT_INIT_3:
         if timedEnd:
-            set_state(SHOOTING_INIT, 0.5)
+            set_state(SHOOTING_INIT)
 
     elif state == SHOOTING_2_WALK:
         if timedEnd:
-            enableWalk()
+            setwalkcmd("start")
             set_state(SHOOTING_2_WALK_POST, 0.5)
     
     elif state == SHOOTING_POST:
         if timedEnd:
-            set_state(SHOOTING_2_WALK, 0)
+            enableWalk()
+            set_state(SHOOTING_2_WALK, 2)
 
     elif state == SHOOTING_INIT:
         playAction(12)
-        set_state(SHOOTING, time, 6)
+        set_state(SHOOTING, 6)
     
     elif state == SHOOTING:
         if timedEnd:
             stopAction()
-            set_state(SHOOTING_POST, 0.1)
+            set_state(SHOOTING_POST, 1)
 
     elif state == SHOOTING_2_WALK_POST:
-        walk.setTarget(y=0.1)
+        walk.setTarget()
         set_state(WALK_INIT_STARTING, 3)
     
     elif state == AUTO_READY_INIT:
         setwalkcmd("start")
         yaw = 0.0
-        walk.setTarget(y=0.1)
+        walk.setTarget()
         set_state(AUTO_READY_INIT_STARTING, 3)
 
     elif state == AUTO_READY_INIT_STARTING:
@@ -289,12 +323,12 @@ def run(time, dets, track_ball, head_control):
     
     elif state == AUTO_READY_POSITIONING:
         if timedEnd:
-            walk.setTarget(0.0, 0.1, 0.5)
+            walk.setTarget(yaw=0.5)
             set_state(AUTO_READY_TURNING, 3)
 
     elif state == AUTO_READY_TURNING:
         if timedEnd:
-            walk.setTarget(y=0.1)
+            walk.setTarget()
             set_state(AUTO_READY_POST, 1 )
 
     elif state == AUTO_READY_POST:
@@ -303,8 +337,9 @@ def run(time, dets, track_ball, head_control):
     
     elif state == AUTO_PLAY:
         setwalkcmd("start")
+        time_play_start = time
         set_state(WALK_INIT, play_delay)
 
     elif state == PAUSE:
         if timedEnd:
-            print("on pause...")
+            return
