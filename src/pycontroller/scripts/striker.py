@@ -47,6 +47,9 @@ SHOOTING_2_WALK_POST = 21
 GOAL_ALIGN_BY_YAW_INIT = 22
 GOAL_ALIGN_BY_YAW_TURNING = 23
 
+BALL_ALIGN_INIT = 24
+BALL_ALIGNING = 25
+
 states_dict = {
     0 : "BALL_SEARCHING",
     1 : "PAUSE",
@@ -72,6 +75,8 @@ states_dict = {
     21 : "SHOOTING_2_WALK_POST",
     22 : "GOAL_ALIGN_BY_YAW_INIT",
     23 : "GOAL_ALIGN_BY_YAW_TURNING",
+    24 : "GOAL_ALIGN_INIT",
+    25 : "GOAL_ALIGNING",
 }
 
 state = PAUSE
@@ -125,6 +130,12 @@ turn_yaw_max_rate = 0.65
 
 time_play_start = 0
 max_time_from_play = 1000
+
+pitch_ball_tar = -0.61
+yaw_ball_tar = -0.14
+ball_tar_deviation = 0.05
+yaw_ball_dev_multipler = 1
+pitch_ball_dev_multipler = 1
 
 def clamp(val, _min, _max):
     return max(min(val, _max), _min)
@@ -213,8 +224,8 @@ def run(time, dets, track_ball, head_control):
     if state == BALL_SEARCHING:
         move = 0.65
         if bt.isEnabled and not gt.enabled and infer.ball_lock: 
-            if head_control[0] < -0.5: move = 0.25
-            if head_control[0] < -0.57 and abs(head_yaw) < 0.1 :
+            if head_pitch < -0.5: move = 0.25
+            if head_pitch < -0.57 and abs(head_yaw) < 0.05 :
                 if abs(yaw) < 0.25:
                     set_state(GOAL_SCAN_INIT)
                 elif time - time_play_start < max_time_from_play:
@@ -222,9 +233,9 @@ def run(time, dets, track_ball, head_control):
                 else:
                     set_state(GOAL_SCAN_INIT)
                 return 
-        yaw_control = plus_or_min(head_yaw, 0.55)
+        yaw_control = clamp(head_yaw, -turn_yaw_max_rate, turn_yaw_max_rate)
         if abs(head_yaw) < 0.1:
-            yaw_control = plus_or_min(head_yaw, 0.25)
+            yaw_control = plus_or_min(head_yaw, 0.3)
         walk.setTarget(0.0, move, yaw_control)
 
     elif state == GOAL_SCAN_INIT: # init scan
@@ -235,10 +246,10 @@ def run(time, dets, track_ball, head_control):
     
     elif state == GOAL_ALIGN_BY_YAW_INIT:
         turn_gain = plus_or_min(-yaw, 1.4)
-        yaw_gain = clamp(turn_gain, -0.4, 0.4)
-        walk.setTarget(-turn_gain , 0.0, yaw_gain)
+        yaw_gain = clamp(turn_gain, -0.42, 0.42)
+        walk.setTarget(-turn_gain , 0.045, yaw_gain)
         setwalkparams(["z_move_amplitude", 0.03])
-        set_state(GOAL_ALIGN_BY_YAW_TURNING, abs(yaw) * 6)
+        set_state(GOAL_ALIGN_BY_YAW_TURNING, abs(yaw) * 10)
 
     elif state == GOAL_ALIGN_BY_YAW_TURNING:
         if timedEnd:
@@ -249,10 +260,26 @@ def run(time, dets, track_ball, head_control):
         if not gt.enabled and goal.found:
             turn_gain = plus_or_min(goal_theta, 1.5)
 
-            yaw_gain = clamp(turn_gain, -0.4, 0.4)
-            walk.setTarget(-turn_gain , 0.0, yaw_gain)
+            yaw_gain = clamp(turn_gain, -0.42, 0.42)
+            walk.setTarget(-turn_gain , 0.045, yaw_gain)
             setwalkparams(["z_move_amplitude", 0.03])
-            set_state(WALK_2_SHOOT_INIT_1, abs(goal_theta) * 6)
+            set_state(BALL_ALIGN_INIT, abs(goal_theta) * 8)
+
+    elif state == BALL_ALIGN_INIT:
+        if timedEnd:
+            set_state(BALL_ALIGNING)
+
+    elif state == BALL_ALIGNING:
+        if bt.isEnabled and not gt.enabled and infer.ball_lock:
+            pitch_deviation = head_pitch - pitch_ball_tar 
+            yaw_deviation =  head_yaw - yaw_ball_tar
+            if abs(pitch_deviation) < ball_tar_deviation:
+                if abs(yaw_deviation) < ball_tar_deviation:
+                    set_state(WALK_2_SHOOT_INIT_1)
+            yaw_out = plus_or_min(yaw_deviation, 0.7)
+            pitch_out = plus_or_min(pitch_deviation, 0.3)
+            pitch_out = clamp(pitch_out, -0.05, 0.3)
+            walk.setTarget(yaw_out, pitch_out, 0.0)
     
     elif state == WALK_2_SHOOT_INIT_1:
         if timedEnd:

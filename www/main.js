@@ -1,4 +1,4 @@
-ws = new WebSocket("ws://"+ "192.168.0.99" +":8077");
+ws = new WebSocket("ws://"+ window.location.href.split('/')[2] +":8077");
 
 var con_h1 = document.getElementById("con_h1");
 var con_log = document.getElementById("log_container");

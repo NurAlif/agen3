@@ -182,6 +182,10 @@ async def ws_handler(websocket, path):
                 striker.ready_time = float(data['params'])
             elif cmd == 'set_play_delay':
                 striker.play_delay = float(data['params'])
+            elif cmd == 'set_yaw_ball_dev_multipler':
+                striker.yaw_ball_dev_multipler = float(data['params'])
+            elif cmd == 'set_pitch_ball_dev_multipler':
+                striker.pitch_ball_dev_multipler = float(data['params'])
             elif cmd == 'enable_gc':
                 enable_gc = int(data['params'])
             elif cmd == 'reset_yaw':
