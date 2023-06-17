@@ -612,7 +612,7 @@ def main():
             if(delta_t > SEND_PARAM_INTERVAL):
                 lastSendParamTic = toc
                 walking.stepToTargetVel()
-                striker.yaw += 0.05 * walking.vectorCurrent.yaw
+                striker.update_odo()
                 updateAngle()
                 sendWithWalkParams()
             

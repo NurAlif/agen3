@@ -50,6 +50,8 @@ GOAL_ALIGN_BY_YAW_TURNING = 23
 BALL_ALIGN_INIT = 24
 BALL_ALIGNING = 25
 
+BALL_SEARCHING_TURNING = 26
+
 states_dict = {
     0 : "BALL_SEARCHING",
     1 : "PAUSE",
@@ -77,6 +79,7 @@ states_dict = {
     23 : "GOAL_ALIGN_BY_YAW_TURNING",
     24 : "GOAL_ALIGN_INIT",
     25 : "GOAL_ALIGNING",
+    26 : "BALL_SEARCHING_TURNING",
 }
 
 state = PAUSE
@@ -136,6 +139,11 @@ yaw_ball_tar = -0.14
 ball_tar_deviation = 0.05
 yaw_ball_dev_multipler = 1
 pitch_ball_dev_multipler = 1
+
+ball_search_loss = 0
+max_ball_search_loss = 100
+
+odo_min_max = 1.5
 
 def clamp(val, _min, _max):
     return max(min(val, _max), _min)
@@ -209,6 +217,7 @@ def run(time, dets, track_ball, head_control):
     global goal_align_angle_time
     global yaw
     global time_play_start
+    global ball_search_loss
 
     deltaT = time - timed_start
     timedEnd = deltaT > timed_delay
@@ -233,10 +242,25 @@ def run(time, dets, track_ball, head_control):
                 else:
                     set_state(GOAL_SCAN_INIT)
                 return 
+            ball_search_loss = 0
+        else:
+            ball_search_loss += 1
         yaw_control = clamp(head_yaw, -turn_yaw_max_rate, turn_yaw_max_rate)
         if abs(head_yaw) < 0.1:
             yaw_control = plus_or_min(head_yaw, 0.3)
         walk.setTarget(0.0, move, yaw_control)
+
+        if ball_search_loss > max_ball_search_loss:
+            walk.setTarget(0.0, 0.0, 1)
+            set_state(BALL_SEARCHING_TURNING, 20)
+            ball_search_loss = 0
+        
+    elif state == BALL_SEARCHING_TURNING:
+        if bt.isEnabled and not gt.enabled and infer.ball_lock:
+            set_state(BALL_SEARCHING)
+        if timedEnd:
+            walk.setTarget(0.0, 0.0, 0.0)
+            set_state(BALL_SEARCHING)
 
     elif state == GOAL_SCAN_INIT: # init scan
         gt.enabled = True
@@ -285,7 +309,7 @@ def run(time, dets, track_ball, head_control):
         if timedEnd:
             walk.setTarget()
             setwalkcmd("stop")
-            set_state(WALK_2_SHOOT_INIT_2, 3)
+            set_state(WALK_2_SHOOT_INIT_2, 1)
     
     elif state == WALK_2_SHOOT_INIT_2:
         if timedEnd:
@@ -370,3 +394,10 @@ def run(time, dets, track_ball, head_control):
     elif state == PAUSE:
         if timedEnd:
             return
+
+def update_odo():
+    global yaw
+    yaw += 0.05 * walk.vectorCurrent.yaw
+
+    if yaw < -odo_min_max: yaw = (odo_min_max*2) + yaw
+    elif yaw > odo_min_max: yaw = (odo_min_max*-2) + yaw

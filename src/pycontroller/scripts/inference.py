@@ -80,11 +80,13 @@ class Tracking:
         self.x = 0.0
         self.y = 0.0
         self.m = 100.0
+        self.found = False
 
     def set(self, tar):
         self.x = tar.x
         self.y = tar.y
         self.m = tar.m
+        self.found = False
 
 def detect(track_ball):
 
