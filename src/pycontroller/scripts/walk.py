@@ -28,7 +28,7 @@ from walk_utils import joints, getWalkParamsDict, setWalkParamsConvert
 
 
 from std_msgs.msg import String, Int32, Bool
-from robotis_controller_msgs.msg import SyncWriteItem, StatusMsg
+from robotis_controller_msgs.msg import SyncWriteItem, StatusMsg, SensorYPR
 from op3_walking_module_msgs.msg import WalkingParam, WalkingCorrection
 from sensor_msgs.msg import Imu, JointState
 from op3_walking_module_msgs.srv import GetWalkingParam
@@ -39,7 +39,7 @@ from robotis_controller_msgs.srv import LoadOffset
 ###############################################################################
 
 pubSWI = rospy.Publisher('/robotis/sync_write_item', SyncWriteItem, queue_size=10)
-pubBT = rospy.Publisher('/robotis/open_cr/button', String, queue_size=10)
+pubBT = rospy.Publisher('/pycontroller/init', String, queue_size=10)
 pubEnaMod = rospy.Publisher('/robotis/enable_ctrl_module', String, queue_size=10)
 pubWalkCmd = rospy.Publisher('/robotis/walking/command', String, queue_size=10)
 pubSetParams = rospy.Publisher('/robotis/walking/set_params', WalkingParam, queue_size=10)
@@ -190,6 +190,16 @@ async def ws_handler(websocket, path):
                 enable_gc = int(data['params'])
             elif cmd == 'reset_yaw':
                 striker.yaw = 0.0
+
+            elif cmd == 'yaw_compe_ball_align':
+                striker.pitch_ball_dev_multipler = float(data['params'])
+            if cmd == 'time_multi_goal_align_yaw':
+                striker.pitch_ball_dev_multipler = float(data['params'])
+            elif cmd == 'time_multi_goal_align':
+                striker.pitch_ball_dev_multipler = float(data['params'])
+            elif cmd == 'yaw_x_turning_max':
+                striker.pitch_ball_dev_multipler = float(data['params'])
+
 
     finally:
         del connected_clients[client_id]
@@ -439,6 +449,7 @@ def init_gyro():
     pubSWI.publish(init_gyro_msg)
 
 imu = Imu()
+sensor_ypr = SensorYPR()
 
 def handleImu(imu_msg_):
     global imu
@@ -507,6 +518,25 @@ def gamestate_callback(data):
         striker.set_state(striker.AUTO_READY_INIT_STARTING, 3)
         gc_state = new_gc_state
 
+def button_callback(data):
+    if data.data == "start":
+        print("start pressed")
+        if striker.state == striker.PAUSE:
+            striker.set_state(striker.AUTO_PLAY)
+        else: walk_toggle(False)
+    elif data.data == "start_long":
+        print("start_long pressed")
+        if robotIsOn: setDxlTorque()
+        else: startRobot()
+    elif data.data == "mode":
+        print("mode pressed")
+        striker.zero_ypr()
+    elif data.data == "mode_long":
+        # striker.zero_ypr()
+        print("mode_long pressed")
+    else:
+        print("unhandled button pressed")
+
 def main():
     global server
     global head_control
@@ -518,8 +548,10 @@ def main():
 
 
     # rospy.Subscriber("/robotis/open_cr/imu", Imu, handleImu)
+    rospy.Subscriber("sensor_ypr", SensorYPR, striker.set_ypr)
     rospy.Subscriber("/robotis/status", StatusMsg, handleStatusMsg)
     rospy.Subscriber("gamestate", String, gamestate_callback)
+    rospy.Subscriber("/robotis/open_cr/button2", String, button_callback)
     # rospy.Subscriber("balance_monitor", String, handleBalanceMonitor)
     
     rospy.loginfo("Waiting manager...")
@@ -612,7 +644,7 @@ def main():
             if(delta_t > SEND_PARAM_INTERVAL):
                 lastSendParamTic = toc
                 walking.stepToTargetVel()
-                striker.update_odo()
+                # striker.update_odo()
                 updateAngle()
                 sendWithWalkParams()
             

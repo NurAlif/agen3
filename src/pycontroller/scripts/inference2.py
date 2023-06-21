@@ -18,7 +18,7 @@ import math
 import streamer as streamer
 
 #DEF YOLO START
-w = '/home/name/best.trt'
+w = '/home/name/models/last.trt'
 device = torch.device('cuda:0')
 
 bindings = None

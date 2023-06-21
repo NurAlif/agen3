@@ -33,8 +33,10 @@ var pidMonGraph =new GraphMonitor(document.getElementById("pid_mon_graph"));
 pidMonGraph.build();
 var goal_detection =new GoalDetection(document.getElementById("goal_detection"));
 goal_detection.build();
+var yaw_dir_vis =new YawDirVis(document.getElementById("yaw_direction"));
+yaw_dir_vis.build();
 
-goal_detection.set_angle(1);
+yaw_dir_vis.set_angle(0);
 
 var field_element = document.getElementById("field");
 var field = new Field(field_element);
@@ -495,7 +497,7 @@ function onSubmitWalking(id){
 }
 
 function handle_angle_update(angle){
-    goal_detection.set_angle(angle)
+    yaw_dir_vis.set_angle(angle)
 }
 
 function onSubmitCB(id){

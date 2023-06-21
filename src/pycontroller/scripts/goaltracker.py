@@ -34,7 +34,7 @@ scan_pos = -1
 scan_step = (max_scan - min_scan)/scan_subdivision
 
 #searching param
-interval_pan = 0.1 #sec
+interval_pan = 0.2 #sec
 hold_pan = 0.1 #sec
 pad_pan = 0.05 #sec
 lastTic = 0
@@ -170,8 +170,13 @@ def track(unclustered_goals):
 
         # goal.setall2(mean_right.item(1), mean_left.item(1), True)
         goal.theta = center
+
+        delta = mean_right-mean_left
+
         goal.found = True
-        goal.span = (mean_right - mean_left)[0]
+        goal.grad = delta[1]
+        goal.span = delta[0]
         print("span: "+str(goal.span))
+        print("grad: "+str(goal.grad))
 
     else: goal.found = False 
