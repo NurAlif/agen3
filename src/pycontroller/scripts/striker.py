@@ -54,6 +54,14 @@ BALL_ALIGNING = 25
 
 BALL_SEARCHING_TURNING = 26
 BALL_SEARCHING_INIT = 27
+START_YAW_COMPE = 28
+END_YAW_COMPE = 29
+
+WALK_2_STANDUP_INIT = 30
+ACTION_2_STANDUP_INIT = 31
+STANDING_UP = 32
+STANDUP_POST = 33
+WALK_2_STANDUP_INIT_2 = 34
 
 states_dict = {
     0 : "BALL_SEARCHING",
@@ -84,6 +92,13 @@ states_dict = {
     25 : "GOAL_ALIGNING",
     26 : "BALL_SEARCHING_TURNING",
     27 : "BALL_SEARCHING_INIT",
+    28 : "START_YAW_COMPE",
+    29 : "END_YAW_COMPE",
+    30 : "WALK_2_STANDUP_INIT",
+    31 : "ACTION_2_STANDUP_INIT",
+    32 : "STANDING_UP",
+    33 : "STANDUP_POST",
+    34 : "WALK_2_STANDUP_INIT_2"
 }
 
 state = PAUSE
@@ -148,7 +163,7 @@ pitch_ball_dev_multipler = 1
 ball_search_loss = 0
 max_ball_search_loss = 100
 
-odo_10min_dev = 0.375
+odo_10min_dev = 0.0
 odo_deviation = 0.0
 time_odo_start = 0
 
@@ -161,13 +176,20 @@ z_amp_turning = 0.03
 z_amp_normal = 0.026
 
 yaw_compe_ball_align = 0.1
-time_multi_goal_align_yaw = 4
+time_multi_goal_align_yaw = 4.5
 time_multi_goal_align = 5
 yaw_x_turning_max = 1.5
 
+enable_goal_det = True
+enable_ball_align = False
+
+set_yaw_compe_start_time = 0.0
+set_yaw_compe_start = 0.0
 
 ypr = np.array([.0,.0,.0])
 ypr_offset = np.array([.0,.0,.0])
+
+standing_up = False
 
 def clamp(val, _min, _max):
     return max(min(val, _max), _min)
@@ -175,6 +197,9 @@ def clamp(val, _min, _max):
 def plus_or_min(val, out):
     if val > 0: return out
     return -out
+
+def set_compe():
+    set_state(START_YAW_COMPE)
 
 def set_ypr(newypr):
     global ypr
@@ -186,6 +211,7 @@ def set_ypr(newypr):
     ypr = ypr - ypr_offset
 
     if show_ypr_counter >= 30:
+        print("pitch: "+str(ypr[1]))
         print("yaw: "+str(yaw))
         show_ypr_counter = 0
     show_ypr_counter+=1
@@ -224,6 +250,8 @@ def init_action(_pubMotionIndex, _isActionRunning, _pubEnaMod, _pubEnableOffset)
 
 def enableWalk():
     global actionEnabled
+    global standing_up
+    standing_up = False
     actionEnabled = False
     pubEnaMod.publish("walking_module")
     pubEnaMod.publish("head_control_module")
@@ -269,6 +297,10 @@ def run(time, dets, track_ball, head_control):
     global yaw
     global time_play_start
     global ball_search_loss
+    global set_yaw_compe_start_time
+    global set_yaw_compe_start
+    global odo_10min_dev
+    global standing_up
 
     deltaT = time - timed_start
     timedEnd = deltaT > timed_delay
@@ -277,6 +309,7 @@ def run(time, dets, track_ball, head_control):
     head_yaw = head_control[1]
     goal = gt.goal
     goal_theta = goal.theta.item(0)
+    pitch = ypr[1]
 
     if show_head_angle:
         print("head py:"+str(head_pitch)+", "+str(head_yaw))
@@ -331,7 +364,10 @@ def run(time, dets, track_ball, head_control):
     elif state == GOAL_ALIGN_BY_YAW_TURNING:
         if timedEnd:
             # yaw = yaw_init
-            set_state(GOAL_SCAN_INIT)
+            if not enable_goal_det:
+                set_state(WALK_2_SHOOT_INIT_1)
+            else: 
+                set_state(GOAL_SCAN_INIT)
 
     elif state == GOAL_SCANING:
         if not gt.enabled:
@@ -342,9 +378,15 @@ def run(time, dets, track_ball, head_control):
                 yaw_gain = clamp(turn_gain, -0.42, 0.42)
                 walk.setTarget(-turn_gain , 0.045, yaw_gain)
                 setwalkparams(["z_move_amplitude", z_amp_turning])
-                set_state(BALL_ALIGN_INIT, abs(goal_theta) * time_multi_goal_align)
+                # if not enable_ball_align:
+                set_state(WALK_2_SHOOT_INIT_1, abs(goal_theta) * time_multi_goal_align)
+                # else: 
+                # set_state(BALL_ALIGN_INIT, abs(goal_theta) * time_multi_goal_align)
             else:
-                set_state(BALL_ALIGN_INIT)
+                # if not enable_ball_align:
+                set_state(WALK_2_SHOOT_INIT_1)
+                # else: 
+                # set_state(BALL_ALIGN_INIT)
                 print("goal not found")
 
 
@@ -453,6 +495,60 @@ def run(time, dets, track_ball, head_control):
     elif state == PAUSE:
         if timedEnd:
             return
+    
+    elif state == START_YAW_COMPE:
+        if timedEnd:
+            set_yaw_compe_start = yaw
+            # set_yaw_compe_start_time = time
+            set_state(END_YAW_COMPE, 10)
+    
+    elif state == END_YAW_COMPE:
+        if timedEnd:
+            # diff_time = time - set_yaw_compe_start_time
+            diff_yaw = yaw - set_yaw_compe_start
+            odo_10min_dev = -diff_yaw*60
+            set_state(PAUSE)
+    
+    elif state == WALK_2_STANDUP_INIT:
+        standing_up = True
+        if timedEnd:
+            setwalkcmd("stop")
+            set_state(WALK_2_STANDUP_INIT_2, 1)
+
+    elif state == WALK_2_STANDUP_INIT_2:
+        if timedEnd:
+            enableAction()
+            set_state(ACTION_2_STANDUP_INIT, 1)
+
+    elif state == ACTION_2_STANDUP_INIT:
+        standing_up = True
+        if timedEnd:
+            if pitch < -500:
+                playAction(21)
+                set_state(STANDING_UP, 15)
+            else:
+                # playAction(22)
+                set_state(PAUSE, 30)
+
+    elif state == STANDING_UP:
+        if timedEnd:
+            stopAction() 
+            set_state(STANDUP_POST, 1)
+
+    elif state == STANDUP_POST:
+        if timedEnd:
+            standing_up = False
+            enableWalk()
+            set_state(WALK_INIT, 2)
+    
+    
+    ####
+
+    if((pitch > 400 or pitch < -700) and not standing_up):
+        if actionEnabled:
+            set_state(PAUSE)
+        else:
+            set_state(WALK_2_STANDUP_INIT)
 
 def update_odo():
     global yaw

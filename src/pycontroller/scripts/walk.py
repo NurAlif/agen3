@@ -200,6 +200,16 @@ async def ws_handler(websocket, path):
             elif cmd == 'yaw_x_turning_max':
                 striker.pitch_ball_dev_multipler = float(data['params'])
 
+            elif cmd == 'enable_goal_det':
+                striker.enable_goal_det = bool(data['params'])
+            if cmd == 'enable_ball_align':
+                striker.enable_ball_align = int(data['params'])
+            
+            elif cmd == "odo_deviation":
+                striker.odo_deviation = float(data['params'])
+            elif cmd == "set_compe":
+                striker.set_compe()
+
 
     finally:
         del connected_clients[client_id]
