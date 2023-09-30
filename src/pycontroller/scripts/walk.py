@@ -13,13 +13,9 @@ import asyncio
 
 # websocket
 import threading
-import inference2 as inference
+import inference3 as inference
 import ball_tracking
-import chaser
 import goaltracker
-import localization as lz
-import recorder_client2 as recorder
-import striker
 
 from configloader import read_walk_balance_conf, read_ball_track_conf, read_walking_conf
 
@@ -35,6 +31,7 @@ from op3_walking_module_msgs.srv import GetWalkingParam
 from op3_action_module_msgs.srv import IsRunning
 from robotis_controller_msgs.srv import LoadOffset
 
+import DATA as striker
     
 ###############################################################################
 
@@ -156,8 +153,6 @@ async def ws_handler(websocket, path):
                 reloadBallTrackerHandle()
             elif cmd == "load_offset":
                 loadOffsetHandle(OFFSET_PATH)
-            elif cmd == "chaser":
-                chaserHandle(data['params'])
             elif cmd == "load_walking_conf":
                 handleLoadWalkingConf()
             elif cmd == "enable_ball_track": 
@@ -171,10 +166,7 @@ async def ws_handler(websocket, path):
             elif cmd == 'save_goal_track':
                 saveGoalTrack(data['params'])
             elif cmd == 'shoot_trigger':
-                # if striker.actionEnabled:
-                #     striker.set_state(striker.SHOOTING_2_WALK)
-                # else:
-                # striker.set_state(striker.WALK_2_SHOOTING)
+
                 striker.set_state(striker.AUTO_PLAY)
             elif cmd == 'set_state':
                 striker.set_state(int(data['params']))
@@ -209,6 +201,13 @@ async def ws_handler(websocket, path):
                 striker.odo_deviation = float(data['params'])
             elif cmd == "set_compe":
                 striker.set_compe()
+
+            elif cmd == "testing_speed_idx":
+                striker.head_speed_idx = int(data['params'])
+            elif cmd == "testing_speed":
+                striker.set_state(striker.TESTING_SPEED_PRE)
+            elif cmd == "robot_avoid":
+                striker.set_state(striker.ROBOT_AVOID_INIT)
 
 
     finally:
@@ -245,10 +244,6 @@ def send_message(id, cmd, params):
     else:
         for client in connected_clients.values():
             asyncio.run_coroutine_threadsafe(send_message2(client, respJson), server_loop)
-
-
-
-
 
 def sendHeadControl():
     js = JointState()
@@ -328,8 +323,6 @@ def saveGoalTrack(param):
     theta = json.dumps(goal.theta.tolist())
     grad = str(goal.grad)
     span = str(goal.span)
-
-    recorder.append(str(param)+","+theta+','+grad+','+span,goaltracker.unclustered_goals)
 
 
 def reloadBallTrackerHandle():
@@ -441,14 +434,6 @@ def handleLoadWalkingConf():
     walking.vectorMultiplier.yaw = read_walking_conf("vector_multipler", "yaw")
 
     send_message(-1, "controller_msg", "walking params updated!")
-
-def chaserHandle(params):
-    if params.cmd == "start":
-        chaser.enabled = True
-        send_message(-1, "controller_msg", "walking_module_enabled")
-    elif params.cmd == "stop":
-        chaser.enabled = False
-        send_message(-1, "controller_msg", "walking_module_disabled")
         
 
 def init_gyro():
@@ -553,30 +538,30 @@ def main():
 
     rospy.init_node('main', anonymous=True)
 
-    server = threading.Thread(target=between_callback, daemon=True)
-    server.start()
-
-
-    # rospy.Subscriber("/robotis/open_cr/imu", Imu, handleImu)
-    rospy.Subscriber("sensor_ypr", SensorYPR, striker.set_ypr)
     rospy.Subscriber("/robotis/status", StatusMsg, handleStatusMsg)
+    rospy.Subscriber("sensor_ypr", SensorYPR, striker.set_ypr)
     rospy.Subscriber("gamestate", String, gamestate_callback)
     rospy.Subscriber("/robotis/open_cr/button2", String, button_callback)
-    # rospy.Subscriber("balance_monitor", String, handleBalanceMonitor)
     
     rospy.loginfo("Waiting manager...")
-    global isManagerReady
     count = 0
     while(isManagerReady==False and count < 10): 
         time.sleep(1)
+        print(count)
         count +=1
+
+    server = threading.Thread(target=between_callback, daemon=True)
+    server.start()
+    rospy.loginfo("ws server starting...")
+
+    time.sleep(10)
 
     print("controller runnning")
     rospy.loginfo("Wait for manager complete")
     getWalkParams()
     startRobot()
 
-    time.sleep(5)
+    time.sleep(10)
 
     reloadBallTrackerHandle()
     handleLoadWalkingConf()
@@ -589,11 +574,7 @@ def main():
         raise SystemExit('ERROR: failed to start inference!')
     else:
         rospy.loginfo("Inference Started")
-        # time.sleep(1)
-        # pubEnableOffset.publish(False)
-        # time.sleep(1)
-        # pubEnableOffset.publish(True)
-        # time.sleep(1)
+
         setWalkParams(["balance_enable", 1])
 
     global lastSendParamTic
@@ -614,7 +595,7 @@ def main():
                 # goaltracker.enabled = not goaltracker.enabled
                 last_goal_scan = toc
 
-            striker.run(toc, dets, track_ball, head_control)
+            striker.run(toc, head_control, dets)
 
             if(goaltracker.enabled):
                 goaltracker.scan(dets)
@@ -654,16 +635,10 @@ def main():
             if(delta_t > SEND_PARAM_INTERVAL):
                 lastSendParamTic = toc
                 walking.stepToTargetVel()
-                # striker.update_odo()
+
                 updateAngle()
                 sendWithWalkParams()
             
-        # except Exception as e:
-        #     shutdown()
-        #     print(sys.exc_info())
-        #     print(e)
-
-
     
             
 
