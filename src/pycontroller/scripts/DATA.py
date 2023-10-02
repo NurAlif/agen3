@@ -215,6 +215,7 @@ standing_up = False
 head_speed_idx = 100
 robot_avoid_dir = 0.0
 robot_dir_acu = []
+data_testing = False
 
 def clamp(val, _min, _max):
     return max(min(val, _max), _min)
@@ -236,8 +237,8 @@ def set_ypr(newypr):
     ypr = ypr - ypr_offset
 
     if show_ypr_counter >= 30:
-        print("pitch: "+str(ypr[1]))
-        print("yaw: "+str(yaw))
+        # print("pitch: "+str(ypr[1]))
+        # print("yaw: "+str(yaw))
         show_ypr_counter = 0
     show_ypr_counter+=1
 
@@ -288,6 +289,12 @@ def enableAction():
         pubEnaMod.publish("action_module")
         pubEnaMod.publish("head_control_module")
 
+def enableActionOnly():
+    global actionEnabled
+    # if not actionEnabled:
+    actionEnabled = True
+    pubEnaMod.publish("action_module")
+
 def playAction(index):
     pubMotionIndex.publish(index)
 
@@ -328,6 +335,7 @@ def run(time, head_control, dets):
     global odo_10min_dev
     global standing_up
     global robot_avoid_dir
+    global data_testing
 
     deltaT = time - timed_start
     timedEnd = deltaT > timed_delay
@@ -572,10 +580,15 @@ def run(time, head_control, dets):
 
     elif state == ROBOT_AVOID_INIT:
         if timedEnd:
+            setwalkcmd("start")
+            walk.setTarget()
+            bt.isEnabled = False
+            data_testing = True
+
             # acumulate avg
-            for d in dets:
+            for d in dets.robots:
                 robot_dir_acu.append(d)
-            set_state(ROBOT_AVOID_EVADE, 2)
+            set_state(ROBOT_AVOID_INIT_AVG, 3)
 
     elif state == ROBOT_AVOID_INIT_AVG:
         if timedEnd:
@@ -584,40 +597,44 @@ def run(time, head_control, dets):
             for d in robot_dir_acu:
                 avg += d
             avg /= len(robot_dir_acu)
+            avg /= 480
+            avg -= 0.5
             # decide walk left or right
-            yaw_control = plus_or_min(-avg, 0.3)
+            yaw_control = plus_or_min(avg, 0.45)
             print("yaw_control_ra : "+str(yaw_control))
             # excecute
             walk.setTarget(0.0, 0.6, yaw_control)
             # store direction
             robot_avoid_dir = yaw_control
-            set_state(ROBOT_AVOID_EVADE, 4)
+            set_state(ROBOT_AVOID_EVADE, 10)
     
     elif state == ROBOT_AVOID_EVADE:
         if timedEnd:
             # load stored dir
             walk.setTarget(0.0, 0.6, -robot_avoid_dir)
             # negative target
-            set_state(ROBOT_AVOID_REALIGN, 4)
+            set_state(ROBOT_AVOID_REALIGN, 10)
     
     elif state == ROBOT_AVOID_REALIGN:
         if timedEnd:
             # straghten
             walk.setTarget()
             # back to main state
-            set_state(WALK_STOP_INIT, 2)
-    
+            set_state(WALK_STOP_INIT, 3)
+    ##
     elif state == TESTING_SPEED_PRE:
         if timedEnd:
-            enableAction()
-            set_state(TESTING_SPEED_INIT, 4)
+            bt.isEnabled = False
+            data_testing = True
+            enableActionOnly()
+            set_state(PAUSE, 4)
     
     elif state == TESTING_SPEED_INIT:
         if timedEnd:
             # load stored dir
             playAction(head_speed_idx)
             # negative target
-            set_state(TESTING_SPEED_POST, 5)
+            set_state(TESTING_SPEED_POST, 10)
     
     elif state == TESTING_SPEED_POST:
         if timedEnd:

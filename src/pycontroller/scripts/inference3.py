@@ -4,16 +4,13 @@
 # center is 0,0
 # right, up = +, -
 
-import torch
-from yolo.iyolo import get_yolo
+from yolo.iyolo import get_yolo, CLASSES
 
 import math
 
 import yolo.streamer as streamer
 
 #DEF YOLO START
-w = '/home/name/best.trt'
-device = torch.device('cuda:0')
 
 videocap = None
 
@@ -52,7 +49,6 @@ def detect(track_ball, d):
     img = videocap.read_in()
 
     dets, draw = YOLO.infer(img)
-    boxes, classes = dets[:4], dets[4]
 
     is_found = False
     d_closest = 1000.0
@@ -61,29 +57,30 @@ def detect(track_ball, d):
     detected_goals = []
     d.robots = []
 
-    for box,cl in zip(boxes,classes):
+    if len(dets) > 0:
+        for box in dets:
+            cl = int(box[4])
+            x = int((box[0] + box[2]) / 2)
+            y = int((box[1] + box[3]) / 2)
+            if cl == 1: #goal
+                detected_goals.append([x, max(box[3], box[1])])
+            elif cl == 2: # robot
+                d.robots.append(x)
+            else:
+                
+                x = (x / res[0] - 0.5) * 2
+                y = (y / res[1] - 0.5) * 2
+                
+                d_x = x - track_ball.x
+                d_y = y - track_ball.y
 
-        x = int((box[0] + box[2]) / 2)
-        y = int((box[1] + box[3]) / 2)
-        if cl == 1: #goal
-            detected_goals.append([x, max(box[3], box[1])])
-        if cl == 2: # robot
-            d.robots.append(x)
-        else:
-            
-            x = (x / res[0] - 0.5) * 2
-            y = (y / res[1] - 0.5) * 2
-            
-            d_x = x - track_ball.x
-            d_y = y - track_ball.y
+                dist = math.sqrt((d_x*d_x) + (d_y*d_y))
 
-            dist = math.sqrt((d_x*d_x) + (d_y*d_y))
-
-            if dist < d_closest:
-                d_closest = dist
-                closest.x = x
-                closest.y = y
-                is_found = True
+                if dist < d_closest:
+                    d_closest = dist
+                    closest.x = x
+                    closest.y = y
+                    is_found = True
 
     d.goals += detected_goals
 

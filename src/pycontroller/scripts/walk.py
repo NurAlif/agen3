@@ -204,6 +204,7 @@ async def ws_handler(websocket, path):
 
             elif cmd == "testing_speed_idx":
                 striker.head_speed_idx = int(data['params'])
+                striker.set_state(striker.TESTING_SPEED_INIT)
             elif cmd == "testing_speed":
                 striker.set_state(striker.TESTING_SPEED_PRE)
             elif cmd == "robot_avoid":
@@ -253,6 +254,13 @@ def sendHeadControl():
     js.position.append(head_control[1])
     pubHeadControl.publish(js)
 
+head_control_once = False
+def sendHeadControlOnce():
+    global head_control_once
+    if not head_control_once:
+        head_control_once = True
+        sendHeadControl()
+
 def sendWithWalkParams():
     if not striker.enabled: return
     if is_walking == False: return
@@ -301,6 +309,7 @@ def startRobot():
     global robotIsOn
     if robotIsOn:
         return
+    print("pub long")
     robotIsOn = True
     pubBT.publish("user_long")
 
@@ -370,7 +379,7 @@ def updateAngle():
     yaw = striker.yaw
     if yaw != striker.last_yaw:
         striker.last_yaw = yaw
-    send_message(-1, 'angle_update', yaw)
+    # send_message(-1, 'angle_update', yaw)
 
 def setWalkCmd(walkCmd):
     global is_walking
@@ -468,12 +477,14 @@ def sendWalkCorrectionConf():
 
 def handleStatusMsg(statusMsg):
     print(statusMsg.status_msg)
+    print("status ^^^^^")
     if(statusMsg.status_msg == "Walking Enabled"):
         init_gyro()
         print("init gyro...")
 
     if(statusMsg.status_msg == "Finish Init Pose"):
         enableWalk()
+        print("ENABLE WALK")
         send_message(-1, "torque_control", True)
         global isManagerReady
         isManagerReady = True
@@ -540,12 +551,12 @@ def main():
 
     rospy.Subscriber("/robotis/status", StatusMsg, handleStatusMsg)
     rospy.Subscriber("sensor_ypr", SensorYPR, striker.set_ypr)
-    rospy.Subscriber("gamestate", String, gamestate_callback)
+    # rospy.Subscriber("gamestate", String, gamestate_callback)
     rospy.Subscriber("/robotis/open_cr/button2", String, button_callback)
-    
+
     rospy.loginfo("Waiting manager...")
     count = 0
-    while(isManagerReady==False and count < 10): 
+    while(isManagerReady==False and count < 100): 
         time.sleep(1)
         print(count)
         count +=1
@@ -560,11 +571,13 @@ def main():
     rospy.loginfo("Wait for manager complete")
     getWalkParams()
     startRobot()
-
+    print(" ")
     time.sleep(10)
 
     reloadBallTrackerHandle()
     handleLoadWalkingConf()
+
+    print("finish")
 
     striker.init(goaltracker, inference, ball_tracking, walking, setWalkParams, setWalkCmd)
     striker.init_action(pubMotionIndex, isActionRunning, pubEnaMod, pubEnableOffset)
@@ -630,7 +643,13 @@ def main():
                 head_control[0] = ball_tracking.pitch
                 head_control[1] = ball_tracking.yaw
 
-            sendHeadControl()
+            elif striker.data_testing:
+                head_control[0] = 0.4
+                head_control[1] = 0.0
+                # sendHeadControlOnce()
+
+            if not striker.data_testing:
+                sendHeadControl()
 
             if(delta_t > SEND_PARAM_INTERVAL):
                 lastSendParamTic = toc
