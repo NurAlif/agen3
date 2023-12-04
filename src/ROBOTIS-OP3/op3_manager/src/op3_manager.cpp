@@ -155,7 +155,7 @@ int main(int argc, char **argv)
   nh.param<std::string>("device_name", g_device_name, SUB_CONTROLLER_DEVICE);
   nh.param<int>("baud_rate", g_baudrate, BAUD_RATE);
 
-  ros::Subscriber button_sub = nh.subscribe("/robotis/open_cr/button", 1, buttonHandlerCallback);
+  ros::Subscriber button_sub = nh.subscribe("/pycontroller/init", 1, buttonHandlerCallback);
   ros::Subscriber dxl_torque_sub = nh.subscribe("/robotis/dxl_torque", 1, dxlTorqueCheckCallback);
   g_init_pose_pub = nh.advertise<std_msgs::String>("/robotis/base/ini_pose", 0);
   g_demo_command_pub = nh.advertise<std_msgs::String>("/ball_tracker/command", 0);

@@ -66,6 +66,8 @@ void BaseModule::initialize(const int control_cycle_msec, robotis_framework::Rob
   /* publish topics */
   status_msg_pub_ = ros_node.advertise<robotis_controller_msgs::StatusMsg>("/robotis/status", 1);
   set_ctrl_module_pub_ = ros_node.advertise<std_msgs::String>("/robotis/enable_ctrl_module", 1);
+  publishStatusMsg(robotis_controller_msgs::StatusMsg::STATUS_INFO, "BASE READY");
+  ROS_INFO("BASE INITIATED"); 
 }
 
 void BaseModule::parseInitPoseData(const std::string &path)

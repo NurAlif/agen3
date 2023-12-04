@@ -6,7 +6,6 @@
 # convention:
 # PRE - > ING -> mas juga
 
-from walking import Vector2yaw
 import time
 import numpy as np
 import math
@@ -63,6 +62,17 @@ STANDING_UP = 32
 STANDUP_POST = 33
 WALK_2_STANDUP_INIT_2 = 34
 
+ROBOT_AVOID_INIT = 35
+ROBOT_AVOID_INIT_AVG = 36
+ROBOT_AVOID_EVADE = 37
+ROBOT_AVOID_REALIGN = 38
+ROBOT_AVOID_POST = 39
+
+TESTING_SPEED_PRE = 40
+TESTING_SPEED_INIT = 41
+TESTING_SPEED_POST = 42
+TESTING_SPEED_STANDBY = 43
+
 states_dict = {
     0 : "BALL_SEARCHING",
     1 : "PAUSE",
@@ -98,7 +108,18 @@ states_dict = {
     31 : "ACTION_2_STANDUP_INIT",
     32 : "STANDING_UP",
     33 : "STANDUP_POST",
-    34 : "WALK_2_STANDUP_INIT_2"
+    34 : "WALK_2_STANDUP_INIT_2",
+#
+    35 : "ROBOT_AVOID_INIT",
+    36 : "ROBOT_AVOID_INIT_AVG",
+    37 : "ROBOT_AVOID_EVADE",
+    38 : "ROBOT_AVOID_REALIGN",
+    39 : "ROBOT_AVOID_POST",
+
+    40 : "TESTING_SPEED_PRE",
+    41 : "TESTING_SPEED_INIT",
+    42 : "TESTING_SPEED_POST",
+    43 : "TESTING_SPEED_STANDBY"
 }
 
 state = PAUSE
@@ -191,6 +212,11 @@ ypr_offset = np.array([.0,.0,.0])
 
 standing_up = False
 
+head_speed_idx = 100
+robot_avoid_dir = 0.0
+robot_dir_acu = []
+data_testing = False
+
 def clamp(val, _min, _max):
     return max(min(val, _max), _min)
 
@@ -211,8 +237,8 @@ def set_ypr(newypr):
     ypr = ypr - ypr_offset
 
     if show_ypr_counter >= 30:
-        print("pitch: "+str(ypr[1]))
-        print("yaw: "+str(yaw))
+        # print("pitch: "+str(ypr[1]))
+        # print("yaw: "+str(yaw))
         show_ypr_counter = 0
     show_ypr_counter+=1
 
@@ -258,9 +284,16 @@ def enableWalk():
 
 def enableAction():
     global actionEnabled
+    if not actionEnabled:
+        actionEnabled = True
+        pubEnaMod.publish("action_module")
+        pubEnaMod.publish("head_control_module")
+
+def enableActionOnly():
+    global actionEnabled
+    # if not actionEnabled:
     actionEnabled = True
     pubEnaMod.publish("action_module")
-    pubEnaMod.publish("head_control_module")
 
 def playAction(index):
     pubMotionIndex.publish(index)
@@ -285,7 +318,7 @@ def init(goal_tracker, inference, ball_tracker, walking, _setwalkparams, _setwal
     setwalkparams = _setwalkparams
     initialized = True
 
-def run(time, dets, track_ball, head_control):
+def run(time, head_control, dets):
     global gt_on_ball_search_last
     global gt_on_ball_search_last_head_pos
     global state
@@ -301,6 +334,8 @@ def run(time, dets, track_ball, head_control):
     global set_yaw_compe_start
     global odo_10min_dev
     global standing_up
+    global robot_avoid_dir
+    global data_testing
 
     deltaT = time - timed_start
     timedEnd = deltaT > timed_delay
@@ -313,9 +348,11 @@ def run(time, dets, track_ball, head_control):
 
     if show_head_angle:
         print("head py:"+str(head_pitch)+", "+str(head_yaw))
+
     if state == BALL_SEARCHING_INIT:
         setwalkparams(["z_move_amplitude", z_amp_normal])
         set_state(BALL_SEARCHING)
+
     elif state == BALL_SEARCHING:
         move = 0.6
         if bt.isEnabled and not gt.enabled and infer.ball_lock: 
@@ -378,10 +415,10 @@ def run(time, dets, track_ball, head_control):
                 yaw_gain = clamp(turn_gain, -0.42, 0.42)
                 walk.setTarget(-turn_gain , 0.045, yaw_gain)
                 setwalkparams(["z_move_amplitude", z_amp_turning])
-                # if not enable_ball_align:
-                set_state(WALK_2_SHOOT_INIT_1, abs(goal_theta) * time_multi_goal_align)
-                # else: 
-                # set_state(BALL_ALIGN_INIT, abs(goal_theta) * time_multi_goal_align)
+                if not enable_ball_align:
+                    set_state(WALK_2_SHOOT_INIT_1, abs(goal_theta) * time_multi_goal_align)
+                else: 
+                    set_state(BALL_ALIGN_INIT, abs(goal_theta) * time_multi_goal_align)
             else:
                 # if not enable_ball_align:
                 set_state(WALK_2_SHOOT_INIT_1)
@@ -540,10 +577,74 @@ def run(time, dets, track_ball, head_control):
             standing_up = False
             enableWalk()
             set_state(WALK_INIT, 2)
-    
-    
-    ####
 
+    elif state == ROBOT_AVOID_INIT:
+        if timedEnd:
+            setwalkcmd("start")
+            walk.setTarget()
+            bt.isEnabled = False
+            data_testing = True
+
+            # acumulate avg
+            for d in dets.robots:
+                robot_dir_acu.append(d)
+            set_state(ROBOT_AVOID_INIT_AVG, 3)
+
+    elif state == ROBOT_AVOID_INIT_AVG:
+        if timedEnd:
+            # calculate avg
+            avg = 0
+            for d in robot_dir_acu:
+                avg += d
+            avg /= len(robot_dir_acu)
+            avg /= 480
+            avg -= 0.5
+            # decide walk left or right
+            yaw_control = plus_or_min(avg, 0.45)
+            print("yaw_control_ra : "+str(yaw_control))
+            # excecute
+            walk.setTarget(0.0, 0.6, yaw_control)
+            # store direction
+            robot_avoid_dir = yaw_control
+            set_state(ROBOT_AVOID_EVADE, 10)
+    
+    elif state == ROBOT_AVOID_EVADE:
+        if timedEnd:
+            # load stored dir
+            walk.setTarget(0.0, 0.6, -robot_avoid_dir)
+            # negative target
+            set_state(ROBOT_AVOID_REALIGN, 10)
+    
+    elif state == ROBOT_AVOID_REALIGN:
+        if timedEnd:
+            # straghten
+            walk.setTarget()
+            # back to main state
+            set_state(WALK_STOP_INIT, 3)
+    ##
+    elif state == TESTING_SPEED_PRE:
+        if timedEnd:
+            bt.isEnabled = False
+            data_testing = True
+            enableActionOnly()
+            set_state(PAUSE, 4)
+    
+    elif state == TESTING_SPEED_INIT:
+        if timedEnd:
+            # load stored dir
+            playAction(head_speed_idx)
+            # negative target
+            set_state(TESTING_SPEED_POST, 10)
+    
+    elif state == TESTING_SPEED_POST:
+        if timedEnd:
+            # straghten
+            stopAction()
+            # back to main state
+            set_state(PAUSE)
+    
+
+    ####
     if((pitch > 400 or pitch < -700) and not standing_up):
         if actionEnabled:
             set_state(PAUSE)

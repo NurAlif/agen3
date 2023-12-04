@@ -13,13 +13,9 @@ import asyncio
 
 # websocket
 import threading
-import inference2 as inference
+import inference3 as inference
 import ball_tracking
-import chaser
 import goaltracker
-import localization as lz
-import recorder_client2 as recorder
-import striker
 
 from configloader import read_walk_balance_conf, read_ball_track_conf, read_walking_conf
 
@@ -28,18 +24,19 @@ from walk_utils import joints, getWalkParamsDict, setWalkParamsConvert
 
 
 from std_msgs.msg import String, Int32, Bool
-from robotis_controller_msgs.msg import SyncWriteItem, StatusMsg
+from robotis_controller_msgs.msg import SyncWriteItem, StatusMsg, SensorYPR
 from op3_walking_module_msgs.msg import WalkingParam, WalkingCorrection
 from sensor_msgs.msg import Imu, JointState
 from op3_walking_module_msgs.srv import GetWalkingParam
 from op3_action_module_msgs.srv import IsRunning
 from robotis_controller_msgs.srv import LoadOffset
 
+import DATA as striker
     
 ###############################################################################
 
 pubSWI = rospy.Publisher('/robotis/sync_write_item', SyncWriteItem, queue_size=10)
-pubBT = rospy.Publisher('/robotis/open_cr/button', String, queue_size=10)
+pubBT = rospy.Publisher('/pycontroller/init', String, queue_size=10)
 pubEnaMod = rospy.Publisher('/robotis/enable_ctrl_module', String, queue_size=10)
 pubWalkCmd = rospy.Publisher('/robotis/walking/command', String, queue_size=10)
 pubSetParams = rospy.Publisher('/robotis/walking/set_params', WalkingParam, queue_size=10)
@@ -156,8 +153,6 @@ async def ws_handler(websocket, path):
                 reloadBallTrackerHandle()
             elif cmd == "load_offset":
                 loadOffsetHandle(OFFSET_PATH)
-            elif cmd == "chaser":
-                chaserHandle(data['params'])
             elif cmd == "load_walking_conf":
                 handleLoadWalkingConf()
             elif cmd == "enable_ball_track": 
@@ -171,10 +166,7 @@ async def ws_handler(websocket, path):
             elif cmd == 'save_goal_track':
                 saveGoalTrack(data['params'])
             elif cmd == 'shoot_trigger':
-                # if striker.actionEnabled:
-                #     striker.set_state(striker.SHOOTING_2_WALK)
-                # else:
-                # striker.set_state(striker.WALK_2_SHOOTING)
+
                 striker.set_state(striker.AUTO_PLAY)
             elif cmd == 'set_state':
                 striker.set_state(int(data['params']))
@@ -190,6 +182,34 @@ async def ws_handler(websocket, path):
                 enable_gc = int(data['params'])
             elif cmd == 'reset_yaw':
                 striker.yaw = 0.0
+
+            elif cmd == 'yaw_compe_ball_align':
+                striker.pitch_ball_dev_multipler = float(data['params'])
+            if cmd == 'time_multi_goal_align_yaw':
+                striker.pitch_ball_dev_multipler = float(data['params'])
+            elif cmd == 'time_multi_goal_align':
+                striker.pitch_ball_dev_multipler = float(data['params'])
+            elif cmd == 'yaw_x_turning_max':
+                striker.pitch_ball_dev_multipler = float(data['params'])
+
+            elif cmd == 'enable_goal_det':
+                striker.enable_goal_det = bool(data['params'])
+            if cmd == 'enable_ball_align':
+                striker.enable_ball_align = int(data['params'])
+            
+            elif cmd == "odo_deviation":
+                striker.odo_deviation = float(data['params'])
+            elif cmd == "set_compe":
+                striker.set_compe()
+
+            elif cmd == "testing_speed_idx":
+                striker.head_speed_idx = int(data['params'])
+                striker.set_state(striker.TESTING_SPEED_INIT)
+            elif cmd == "testing_speed":
+                striker.set_state(striker.TESTING_SPEED_PRE)
+            elif cmd == "robot_avoid":
+                striker.set_state(striker.ROBOT_AVOID_INIT)
+
 
     finally:
         del connected_clients[client_id]
@@ -226,10 +246,6 @@ def send_message(id, cmd, params):
         for client in connected_clients.values():
             asyncio.run_coroutine_threadsafe(send_message2(client, respJson), server_loop)
 
-
-
-
-
 def sendHeadControl():
     js = JointState()
     js.name.append("head_tilt")
@@ -237,6 +253,13 @@ def sendHeadControl():
     js.position.append(head_control[0])
     js.position.append(head_control[1])
     pubHeadControl.publish(js)
+
+head_control_once = False
+def sendHeadControlOnce():
+    global head_control_once
+    if not head_control_once:
+        head_control_once = True
+        sendHeadControl()
 
 def sendWithWalkParams():
     if not striker.enabled: return
@@ -286,6 +309,7 @@ def startRobot():
     global robotIsOn
     if robotIsOn:
         return
+    print("pub long")
     robotIsOn = True
     pubBT.publish("user_long")
 
@@ -308,8 +332,6 @@ def saveGoalTrack(param):
     theta = json.dumps(goal.theta.tolist())
     grad = str(goal.grad)
     span = str(goal.span)
-
-    recorder.append(str(param)+","+theta+','+grad+','+span,goaltracker.unclustered_goals)
 
 
 def reloadBallTrackerHandle():
@@ -357,7 +379,7 @@ def updateAngle():
     yaw = striker.yaw
     if yaw != striker.last_yaw:
         striker.last_yaw = yaw
-    send_message(-1, 'angle_update', yaw)
+    # send_message(-1, 'angle_update', yaw)
 
 def setWalkCmd(walkCmd):
     global is_walking
@@ -421,14 +443,6 @@ def handleLoadWalkingConf():
     walking.vectorMultiplier.yaw = read_walking_conf("vector_multipler", "yaw")
 
     send_message(-1, "controller_msg", "walking params updated!")
-
-def chaserHandle(params):
-    if params.cmd == "start":
-        chaser.enabled = True
-        send_message(-1, "controller_msg", "walking_module_enabled")
-    elif params.cmd == "stop":
-        chaser.enabled = False
-        send_message(-1, "controller_msg", "walking_module_disabled")
         
 
 def init_gyro():
@@ -439,6 +453,7 @@ def init_gyro():
     pubSWI.publish(init_gyro_msg)
 
 imu = Imu()
+sensor_ypr = SensorYPR()
 
 def handleImu(imu_msg_):
     global imu
@@ -462,12 +477,14 @@ def sendWalkCorrectionConf():
 
 def handleStatusMsg(statusMsg):
     print(statusMsg.status_msg)
+    print("status ^^^^^")
     if(statusMsg.status_msg == "Walking Enabled"):
         init_gyro()
         print("init gyro...")
 
     if(statusMsg.status_msg == "Finish Init Pose"):
         enableWalk()
+        print("ENABLE WALK")
         send_message(-1, "torque_control", True)
         global isManagerReady
         isManagerReady = True
@@ -507,37 +524,60 @@ def gamestate_callback(data):
         striker.set_state(striker.AUTO_READY_INIT_STARTING, 3)
         gc_state = new_gc_state
 
+def button_callback(data):
+    if data.data == "start":
+        print("start pressed")
+        if striker.state == striker.PAUSE:
+            striker.set_state(striker.AUTO_PLAY)
+        else: walk_toggle(False)
+    elif data.data == "start_long":
+        print("start_long pressed")
+        if robotIsOn: setDxlTorque()
+        else: startRobot()
+    elif data.data == "mode":
+        print("mode pressed")
+        striker.zero_ypr()
+    elif data.data == "mode_long":
+        # striker.zero_ypr()
+        print("mode_long pressed")
+    else:
+        print("unhandled button pressed")
+
 def main():
     global server
     global head_control
 
     rospy.init_node('main', anonymous=True)
 
+    rospy.Subscriber("/robotis/status", StatusMsg, handleStatusMsg)
+    rospy.Subscriber("sensor_ypr", SensorYPR, striker.set_ypr)
+    # rospy.Subscriber("gamestate", String, gamestate_callback)
+    rospy.Subscriber("/robotis/open_cr/button2", String, button_callback)
+
+    rospy.loginfo("Waiting manager...")
+    count = 0
+    while(isManagerReady==False and count < 100): 
+        time.sleep(1)
+        print(count)
+        count +=1
+
     server = threading.Thread(target=between_callback, daemon=True)
     server.start()
+    rospy.loginfo("ws server starting...")
 
-
-    # rospy.Subscriber("/robotis/open_cr/imu", Imu, handleImu)
-    rospy.Subscriber("/robotis/status", StatusMsg, handleStatusMsg)
-    rospy.Subscriber("gamestate", String, gamestate_callback)
-    # rospy.Subscriber("balance_monitor", String, handleBalanceMonitor)
-    
-    rospy.loginfo("Waiting manager...")
-    global isManagerReady
-    count = 0
-    while(isManagerReady==False and count < 10): 
-        time.sleep(1)
-        count +=1
+    time.sleep(10)
 
     print("controller runnning")
     rospy.loginfo("Wait for manager complete")
     getWalkParams()
     startRobot()
-
-    time.sleep(5)
+    print(" ")
+    time.sleep(10)
 
     reloadBallTrackerHandle()
     handleLoadWalkingConf()
+
+    print("finish")
 
     striker.init(goaltracker, inference, ball_tracking, walking, setWalkParams, setWalkCmd)
     striker.init_action(pubMotionIndex, isActionRunning, pubEnaMod, pubEnableOffset)
@@ -547,11 +587,7 @@ def main():
         raise SystemExit('ERROR: failed to start inference!')
     else:
         rospy.loginfo("Inference Started")
-        # time.sleep(1)
-        # pubEnableOffset.publish(False)
-        # time.sleep(1)
-        # pubEnableOffset.publish(True)
-        # time.sleep(1)
+
         setWalkParams(["balance_enable", 1])
 
     global lastSendParamTic
@@ -572,7 +608,7 @@ def main():
                 # goaltracker.enabled = not goaltracker.enabled
                 last_goal_scan = toc
 
-            striker.run(toc, dets, track_ball, head_control)
+            striker.run(toc, head_control, dets)
 
             if(goaltracker.enabled):
                 goaltracker.scan(dets)
@@ -607,21 +643,21 @@ def main():
                 head_control[0] = ball_tracking.pitch
                 head_control[1] = ball_tracking.yaw
 
-            sendHeadControl()
+            elif striker.data_testing:
+                head_control[0] = 0.4
+                head_control[1] = 0.0
+                # sendHeadControlOnce()
+
+            if not striker.data_testing:
+                sendHeadControl()
 
             if(delta_t > SEND_PARAM_INTERVAL):
                 lastSendParamTic = toc
                 walking.stepToTargetVel()
-                striker.yaw += 0.05 * walking.vectorCurrent.yaw
+
                 updateAngle()
                 sendWithWalkParams()
             
-        # except Exception as e:
-        #     shutdown()
-        #     print(sys.exc_info())
-        #     print(e)
-
-
     
             
 

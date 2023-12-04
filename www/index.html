@@ -453,12 +453,15 @@
                                 class="btn btn-success btn-md">Load Walking Conf</button>
                 <button id="shoot_trigger" onclick="sendCmd('shoot_trigger');" type="button"
                                 class="btn btn-success btn-md">shoot trigger</button>
+                <button id="set_compe" onclick="sendCmd('set_compe');" type="button"
+                                class="btn btn-success btn-md">set_compe</button>
             </div>
             <div class="row">
                 <div style="background-color: blue;">
                     <video id="video" style="width: 500px" autoplay="true" playsinline="true"></video>
                 </div>
                 <canvas id="goal_detection" width="300" style="border:1px solid #000000;"></canvas>
+                <canvas id="yaw_direction" width="300" style="border:1px solid #000000;"></canvas>
             </div>
             <div class="row">
                 <canvas id="field" width="620" style="border:2px solid #800990;"></canvas>
